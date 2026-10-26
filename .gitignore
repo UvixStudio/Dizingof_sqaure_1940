@@ -1,0 +1,9 @@
+# תמונות מחקר וארכיון: זכויות לא מסודרות, וגם כבדות. נשארות מקומית בלבד
+data/
+# גרסאות ישנות וסקריפטי תיקון
+src/_archive/
+.freebuff/
+node_modules/
+.vercel/
+.DS_Store
+Thumbs.db

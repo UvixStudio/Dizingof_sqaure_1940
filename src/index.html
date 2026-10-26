@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>כיכר דיזנגוף 1940</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Assistant:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div dir="rtl">
+  <canvas id="gl" aria-label="סקיצה תלת־ממדית של כיכר דיזנגוף ב־1940"></canvas>
+  <canvas id="grain" aria-hidden="true"></canvas>
+  <div class="vig" aria-hidden="true"></div>
+
+  <header class="top">
+    <div class="title">
+      <h1 id="home" role="button" tabindex="0" title="חזרה למבט הפתיחה">כיכר דיזנגוף, 1940</h1>
+      <p>שחזור בהשראה · סקיצה v1</p>
+    </div>
+    <button class="pill" id="info-btn" aria-expanded="false" aria-controls="notes">על הסקיצה</button>
+  </header>
+
+  <button class="veil" id="veil" aria-label="סגירת החלון" hidden></button>
+  <aside class="card" id="card" role="dialog" aria-modal="false" aria-labelledby="card-title" hidden></aside>
+
+  <section class="notes" id="notes" hidden>
+    <h2>מה מדויק ומה משוער</h2>
+    <ul>
+      <li>הבלוקים, הרווחים וכיווני הרחובות נמדדו מתוכנית אוורבוך ("ידיעות עיריית תל אביב", חוברת 2, עמ' 51), בדיוק של כ־<span class="k">3°</span>.</li>
+      <li>שמות רחובות הצד (ריינס, זמנהוף, בן עמי, פינסקר) משובצים זמנית עד שיהיו נתוני OSM. שני הקצוות הם דיזנגוף.</li>
+      <li>סדר הטבעות לפי התצלומים והתיאור: בריכה, דשא, שביל חול, דשא עם דקלים, וארבעה שבילים חוצים.</li>
+      <li>אי של <span class="k">66 מ'</span> וחזיתות במרחק כ־<span class="k">47 מ'</span> מהמרכז. הערכה.</li>
+      <li>מיקום קולנוע אסתר זמני. הכרזות הן עיצוב מומצא, בלי דמויות.</li>
+      <li>המכוניות, האוטובוס והעגלה בהשראת התקופה, לא דגמים מתועדים.</li>
+      <li>כל בלוק הוא לולאה סגורה אחת עם ארבע פינות מעוגלות. פסי המרפסות, המעקים, הסוככים והוויטרינות מקיפים את כל הבניין, כמו בתצלומים.</li>
+      <li>נקודות המידע (העיגולים החומים) מבוססות על ויקיפדיה ועל המקורות שמצוינים בכל כרטיס.</li>
+    </ul>
+  </section>
+
+  <section class="bar" aria-label="שליטה">
+    <div class="row">
+      <div class="seg" role="group" aria-label="נקודת מבט">
+        <button id="v-in" aria-pressed="true">בתוך הכיכר</button>
+        <button id="v-walk" aria-pressed="false">מהמדרכה</button>
+        <button id="v-roof" aria-pressed="false">מגג</button>
+        <button id="v-top" aria-pressed="false">מבט על</button>
+      </div>
+      <button class="btn" id="gyro">סיבוב עם הטלפון</button>
+      <button class="btn" id="north" hidden>יישור לצפון</button>
+    </div>
+    <p class="hint" id="hint">גרור כדי להסתובב. צביטה לזום.</p>
+    <div class="row spots" id="spots"><span class="hint">נקודות מידע:</span>
+      <button class="pill" data-spot="genia">ג'ניה אוורבוך</button>
+      <button class="pill" data-spot="video">Here We Are</button>
+    </div>
+  </section>
+</div>
+
+
+<script src="lib/three.min.js"></script>
+<script src="scene.js"></script>
+</body>
+</html>
