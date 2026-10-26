@@ -125,16 +125,22 @@
     go(); if (document.fonts && document.fonts.load) document.fonts.load('700 100px "Frank Ruhl Libre"').then(go).catch(() => {});
     return tex;
   }
-  const signTex = (name) => canvasTex(1024, 340, (x) => {
-    // text only, no plate: dark ink with a light halo so it reads over sky and facades
-    x.lineJoin = "round"; x.strokeStyle = "#f1ead6"; x.fillStyle = "#1d2a46";
-    x.font = "500 58px " + SERIF; x.lineWidth = 12; x.strokeText("רחוב", 512, 92); x.fillText("רחוב", 512, 92);
-    x.font = "700 160px " + SERIF; x.lineWidth = 18; x.strokeText(name, 512, 210); x.fillText(name, 512, 210);
+  const signTex = (name, en) => canvasTex(768, 384, (x) => {   // enamel street plate: Hebrew over Latin, nothing else
+    rr(x, 6, 6, 756, 372, 40); x.fillStyle = "rgba(29,42,90,.78)"; x.fill();
+    x.strokeStyle = "#ffffff"; x.lineWidth = 6; rr(x, 24, 24, 720, 336, 28); x.stroke();
+    x.fillStyle = "#ffffff"; x.font = "700 150px " + SERIF; x.fillText(name, 384, 140);
+    x.font = "600 76px " + SERIF; x.fillText(en, 384, 292);
   });
   const groundTex = (name) => canvasTex(1024, 320, (x) => { x.fillStyle = "rgba(43,41,37,.7)"; x.font = "700 210px " + SERIF; x.fillText(name, 512, 165); });
   const marqueeTex = () => canvasTex(1024, 220, (x) => {
     rr(x, 4, 4, 1016, 212, 28); x.fillStyle = "#3a2b25"; x.fill(); x.strokeStyle = "#d8c79e"; x.lineWidth = 5; rr(x, 20, 20, 984, 180, 18); x.stroke();
     x.fillStyle = "#e6d6ac"; x.font = "700 130px " + SERIF; x.fillText("קולנוע אסתר", 512, 112);
+  });
+  const vertNameTex = () => canvasTex(256, 672, (x) => {   // the name reading top to bottom on the flat end
+    x.fillStyle = "#2b2b2e"; x.fillRect(42, 10, 172, 652);
+    x.strokeStyle = "#e4d7a8"; x.lineWidth = 5; x.strokeRect(54, 24, 148, 624);
+    x.fillStyle = "#f0e3bb"; x.font = "700 104px " + SERIF;
+    "קולנוע אסתר".split("").filter((ch) => ch !== " ").forEach((ch, i) => x.fillText(ch, 128, 92 + i * 59));
   });
   const posterTex = (bg, fg, lines, sub, dots) => canvasTex(256, 372, (x) => {
     x.fillStyle = bg; x.fillRect(0, 0, 256, 372);
@@ -152,22 +158,29 @@
   // building blocks as read off Averbuch's plan (north up): degrees clockwise from north, about +-3 deg
   const BLOCKS = [[9, 49], [59, 83], [114, 141], [154, 183], [194, 276], [299, 347]];
   const NAMES = ["דיזנגוף", "ריינס", "זמנהוף", "בן עמי", "דיזנגוף", "פינסקר"];   // side-street names are provisional
+  const EN = ["DIZENGOFF", "REINES", "ZAMENHOF", "BEN AMI", "DIZENGOFF", "PINSKER"];
   const ARMS = BLOCKS.map((b, k) => {            // arm k = the street gap just before block k
     const pv = BLOCKS[(k + BLOCKS.length - 1) % BLOCKS.length];
     let a0 = pv[1], a1 = b[0]; if (a1 < a0) a1 += 360;
     const half = Math.max(8, Math.min(FACADE * Math.sin(D((a1 - a0) / 2)), 14));
-    return { t: D(((a0 + a1) / 2) % 360), name: NAMES[k], gap: half, road: Math.max(5, half - 3) };
+    return { t: D(((a0 + a1) / 2) % 360), name: NAMES[k], en: EN[k], gap: half, road: Math.max(5, half - 3) };
   });
   const signs = [];
+  const SIGN_Y = 16, SIGN_W = 4.8, SIGN_H = 2.4;
+  const fadeTex = (() => { const c = document.createElement("canvas"); c.width = 4; c.height = 128; const x = c.getContext("2d"), g = x.createLinearGradient(0, 0, 0, 128);
+    g.addColorStop(0, "rgba(29,42,90,.85)"); g.addColorStop(.55, "rgba(29,42,90,.4)"); g.addColorStop(1, "rgba(29,42,90,0)"); x.fillStyle = g; x.fillRect(0, 0, 4, 128); return new THREE.CanvasTexture(c); })();
+  const padTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d"), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    g.addColorStop(0, "rgba(40,62,130,.85)"); g.addColorStop(.45, "rgba(40,62,130,.55)"); g.addColorStop(1, "rgba(40,62,130,0)"); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
   function addSign(a) {
-    const s = new THREE.Group(); s.position.copy(P(44, a.t, 12)); scene.add(s);
-    const sm = new THREE.MeshBasicMaterial({ map: signTex(a.name), transparent: true, opacity: 1, depthWrite: false, side: THREE.DoubleSide }); s.userData.m = sm;
-    s.add(new THREE.Mesh(new THREE.PlaneGeometry(8, 2.7), sm));
+    const s = new THREE.Group(); s.position.copy(P(44, a.t, SIGN_Y)); scene.add(s);
+    const sm = new THREE.MeshBasicMaterial({ map: signTex(a.name, a.en), transparent: true, opacity: 1, depthWrite: false, side: THREE.DoubleSide }); s.userData.m = sm;
+    s.add(new THREE.Mesh(new THREE.PlaneGeometry(SIGN_W, SIGN_H), sm));
+    // a hairline that fades into the ground, ending in a soft blue dot: it reads as a marker, not a pole
+    const base = P(44, a.t, 0), stem = new THREE.Mesh(new THREE.PlaneGeometry(.1, SIGN_Y - SIGN_H / 2), new THREE.MeshBasicMaterial({ map: fadeTex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+    stem.position.set(base.x, (SIGN_Y - SIGN_H / 2) / 2, base.z); scene.add(stem); s.userData.stem = stem;
+    const dotM = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: padTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    dotM.position.set(base.x, .13, base.z); scene.add(dotM);
     signs.push(s);
-    const base = P(44, a.t, 0);
-    scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(base.x, .1, base.z), P(44, a.t, 10.5)]), inkB));
-    const ring = new THREE.Mesh(new THREE.RingGeometry(.9, 1.3, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: C.ink, transparent: true, opacity: .5, depthWrite: false }));
-    ring.position.set(base.x, .12, base.z); scene.add(ring);
   }
 
   // ground, ring road, sidewalks
@@ -242,19 +255,29 @@
     const st = []; for (let k = 0; k < 3; k++) { const a = k * 2.1; st.push(new THREE.Vector3(Math.cos(a) * .7 * s, 0, Math.sin(a) * .7 * s), new THREE.Vector3(0, 2.6 * s, 0)); }
     g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(st), inkC));
   }
-  function palm(x, z, h = 2.8) {   // young date palm: short trunk, heavy drooping crown
+  const frondMat = new THREE.MeshLambertMaterial({ color: 0x6f8c54, side: THREE.DoubleSide });
+  function palm(x, z, h = 2.8) {   // date palm: ringed trunk, crown of arching fronds, each with a double row of drooping leaflets
     const g = new THREE.Group(); g.position.set(x, 0, z); scene.add(g);
-    mesh(new THREE.CylinderGeometry(.24, .34, h, 7).translate(0, h / 2, 0), 0xb7a688, g, { thresh: 40 });
-    const pts = [];
-    for (let k = 0; k < 16; k++) {
-      const a = k / 16 * Math.PI * 2 + rnd() * .3, L = 2.2 + rnd() * .7;
-      let prev = new THREE.Vector3(0, h, 0);
-      for (let sg = 1; sg <= 6; sg++) {
-        const u = sg / 6, p = new THREE.Vector3(Math.cos(a) * L * u, h + .7 * u - 1.5 * u * u, Math.sin(a) * L * u);
-        pts.push(prev, p); prev = p;
+    mesh(new THREE.CylinderGeometry(.2, .32, h, 8).translate(0, h / 2, 0), 0xb7a688, g, { thresh: 40 });
+    const v = [], nF = 13;
+    for (let k = 0; k < nF; k++) {
+      const a = k / nF * Math.PI * 2 + rnd() * .25, L = 2.3 + rnd() * .8, lift = (k % 3 === 0 ? 1.3 : .6) + rnd() * .3;
+      const ca = Math.cos(a), sa = Math.sin(a), sx = -sa, sz = ca;                 // sideways direction for the leaflets
+      let prev = null;
+      for (let sg = 0; sg <= 9; sg++) {
+        const u = sg / 9, px = ca * L * u, pz = sa * L * u, py = h + lift * Math.sin(u * 2.2) - 1.7 * u * u;
+        if (prev && sg > 1) {
+          const ll = (.75 * Math.sin(Math.min(1, u * 1.15) * Math.PI * .9) + .12) * (L / 2.6);
+          for (const sd of [-1, 1]) {
+            const tx = px + sx * sd * ll, tz = pz + sz * sd * ll, ty = py - ll * .75;
+            v.push(prev[0], prev[1], prev[2], px, py, pz, tx, ty, tz);
+          }
+        }
+        prev = [px, py, pz];
       }
     }
-    g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x66804f, transparent: true, opacity: .95, fog: true })));
+    const fg = new THREE.BufferGeometry(); fg.setAttribute("position", new THREE.Float32BufferAttribute(v, 3)); fg.computeVertexNormals();
+    g.add(new THREE.Mesh(fg, frondMat));
   }
   const nearPath = (deg) => [0, 2, 4, 5].some((k) => Math.abs(((deg - ARMS[k].t * 180 / Math.PI + 540) % 360) - 180) < 7);
   for (let k = 0; k < 12; k++) { const d = k * 30 + 15; if (nearPath(d)) continue; const p = P(26.5, D(d), 0); palm(p.x, p.z, 2.4 + rnd()); }
@@ -405,6 +428,16 @@
     mesh(deck(A, B, y), col, scene, { sketchy: false, mat: inkC });
   }
 
+  const shade = (c) => new THREE.Color(c).multiplyScalar(.72).getHex();
+  const quiet = { thresh: 80, sketchy: false, mat: inkC };
+  function balcony(loop, out, y, col, h = 1.0) {
+    const f = closed(offsetLoop(loop, out)), r = closed(offsetLoop(loop, out - .14));
+    mesh(ribbon(f, y, y + .2), col, scene, quiet);                       // thin slab edge
+    mesh(ribbon(r, y + .2, y + .36), shade(col), scene, { thresh: 80, sketchy: false, mat: inkB });   // shadow reveal
+    mesh(ribbon(f, y + .36, y + .2 + h), col, scene, quiet);             // thick parapet strip
+    mesh(deck(closed(loop), f, y + .2 + h), col, scene, { sketchy: false, mat: inkB });
+  }
+
   // ---------- buildings around the circle ----------
   const FLOOR = 3, GROUND = 4.2;
   const gapAt = (a) => Math.asin(a.gap / FACADE);
@@ -414,15 +447,31 @@
     const t0 = a.t + gapAt(a), t1 = (b.t < a.t ? b.t + Math.PI * 2 : b.t) - gapAt(b);
     const cinemaBlock = i === 3;                              // position of the cinema is a placeholder
     const n = cinemaBlock ? 1 : Math.max(1, Math.round((t1 - t0) / D(30)));
+    const wts = Array.from({ length: n }, (_, k) => .75 + ((bi + k * 3) % 4) * .22), wsum = wts.reduce((p, q) => p + q, 0), cuts = [0];
+    wts.forEach((w) => cuts.push(cuts[cuts.length - 1] + w / wsum));
+    const GAPA = (3.9 / FACADE) / 2;                           // ~3.9 m between neighbouring facades
     for (let k = 0; k < n; k++) {
-      const s0 = t0 + (t1 - t0) * k / n + (k ? D(.8) : 0), s1 = t0 + (t1 - t0) * (k + 1) / n - (k < n - 1 ? D(.8) : 0);
+      const s0 = t0 + (t1 - t0) * cuts[k] + (k ? GAPA : 0), s1 = t0 + (t1 - t0) * cuts[k + 1] - (k < n - 1 ? GAPA : 0);
       const cinema = cinemaBlock;
-      // the cinema, as in the archive photo: a white banded front block like its neighbours, the hall with its hipped roof behind
-      const floors = cinema ? 4 : [3, 4, 3, 3, 4, 3, 3][bi % 7];
-      const H = GROUND + floors * FLOOR;
+      const floors = cinema ? 0 : [3, 5, 4, 2, 4, 6, 3, 5, 4, 3, 5][bi % 11];
+      const H = cinema ? 15 : GROUND + floors * FLOOR;
       const col = cinema ? C.cinema : C.plaster[bi % C.plaster.length];
       const BAL = 1.5, PAR = 1.0, SLAB = .22;
-      {
+      if (cinema) {
+        const loop = blockLoop(s0, s1), lc = closed(loop), skin = closed(offsetLoop(loop, .05));
+        mesh(ribbon(lc, 0, H), col, scene, { thresh: 50 });
+        mesh(cap(loop, H), col, scene, { sketchy: false, mat: inkC });
+        scene.add(new THREE.Mesh(ribbon(skin, .4, 4.6, 4), shopMat));                   // foyer glazing
+        band(loop, 2.6, 4.9, .22, 0xc08a78);                                             // deep canopy over the entrance
+        [8.4, 11.6].forEach((y) => balcony(loop, 1.5, y, col, 1.15));                    // two heavy bands
+        balcony(loop, 1.5, H, col, .8);
+        // the flat end: a plain slab that steps forward of the balcony bands and carries the name, as in the photo
+        const ta = s1 - D(4.2), TD = 9, TW = 5.6, TH = H + 5.5, tw = new THREE.Group();
+        tw.position.copy(P(FACADE - 1.5 + TD / 2, ta, 0)); tw.rotation.y = -ta; scene.add(tw);
+        mesh(new THREE.BoxGeometry(TW, TH, TD).translate(0, TH / 2, 0), col, tw, { thresh: 40, sketchy: false });
+        const nameM = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 9.5), new THREE.MeshBasicMaterial({ map: vertNameTex(), transparent: true }));
+        nameM.position.set(0, TH - 7, -TD / 2 - .06); nameM.rotation.y = Math.PI; tw.add(nameM);      // name down the flat face
+      } else {
         const loop = blockLoop(s0, s1), lc = closed(loop), skin = closed(offsetLoop(loop, .05));
         mesh(ribbon(lc, 0, H), col, scene, { thresh: 50 });                            // the block itself
         mesh(cap(loop, H), col, scene, { sketchy: false, mat: inkC });
@@ -431,35 +480,40 @@
         for (let f = 0; f < floors; f++) {
           const y = GROUND + f * FLOOR;
           scene.add(new THREE.Mesh(ribbon(skin, y + .95, y + 2.75, 3.4), winMat));      // window band, in the shade of the slab
-          band(loop, BAL, y - .04, SLAB, col);                                          // thin slab edge at the bottom
-          parapet(loop, BAL, y - .04 + SLAB, PAR, col);                                  // body, reveal groove, thicker coping
+          balcony(loop, BAL, y - .04, col);
         }
-        band(loop, BAL, H, .22, col);                                                   // roof slab
-        parapet(loop, BAL, H + .22, .8, col);
-        if (!cinema) for (let q = 0; q < 2; q++) {   // roof clutter
+        balcony(loop, BAL, H, col, .8);                                                 // roof edge
+        if (bi % 3 === 1) {                                                              // straight stair tower at one end, flat and unbanded
+          const am = bi % 2 ? s0 + D(2.2) : s1 - D(2.2), tg = new THREE.Group(); tg.position.copy(P(FACADE + 5.5, am, 0)); tg.rotation.y = -am; scene.add(tg);
+          mesh(new THREE.BoxGeometry(3.4, H + 3.2, 7).translate(0, (H + 3.2) / 2, 0), col, tg, { thresh: 30 });
+          for (let f = 0; f < floors; f++) mesh(new THREE.BoxGeometry(.7, 1.5, .2).translate(0, GROUND + f * FLOOR + 1.6, -3.55), 0x4e5a61, tg, { sketchy: false });
+        }
+        for (let q = 0; q < 2; q++) {   // roof clutter
           const ang = s0 + (s1 - s0) * (.25 + rnd() * .5), rad = FACADE + 6 + rnd() * 5, rg = new THREE.Group(); rg.position.copy(P(rad, ang, H)); rg.rotation.y = -ang; scene.add(rg);
           if (q === 0) mesh(new THREE.BoxGeometry(3.2, 2.4, 2.6).translate(0, 1.2, 0), col, rg, { thresh: 20 });
           else { mesh(new THREE.BoxGeometry(1.6, .8, 1.6).translate(0, .4, 0), 0xaaa597, rg, { sketchy: false }); mesh(new THREE.CylinderGeometry(.9, .9, 1.3, 10).translate(0, 1.45, 0), 0xb9b3a6, rg, { thresh: 30 }); }
         }
       }
       if (cinema) {
-        const mid = (s0 + s1) / 2, front = FACADE - BAL - .35;     // square side, in front of the balcony bands, never behind them
+        const mid = (s0 + s1) / 2;
         cinemaAt = mid;
+        // kept from the local line: the hall with its hipped roof stands behind the front block, as in the archive photo
         const hall = new THREE.Group(); hall.position.copy(P(FACADE + DEPTH + 9, mid, 0)); hall.rotation.y = -mid; scene.add(hall);
         mesh(new THREE.BoxGeometry(22, 13, 18).translate(0, 6.5, 0), col, hall, { thresh: 20 });
         mesh(new THREE.ConeGeometry(1, 1, 4, 1).rotateY(Math.PI / 4).scale(15.6, 4.5, 12.7).translate(0, 15.25, 0), 0xb3ad9f, hall, { thresh: 20 });
-        // the name stands on the roof parapet, the posters hang on the lower right corner as in the photo
+        arcLine(FACADE - .02, s0 + D(1), s1 - D(1), 9.8); arcLine(FACADE - .02, s0 + D(1), s1 - D(1), 12);
+        const BOARD = FACADE - 2.0;                                  // in front of the balcony bands, so nothing covers it
         const mq = new THREE.Mesh(new THREE.PlaneGeometry(11, 2.4), new THREE.MeshBasicMaterial({ map: marqueeTex(), transparent: true, side: THREE.DoubleSide }));
-        mq.position.copy(P(front, mid, H + 1.02 + 1.3)); mq.rotation.y = -mid; scene.add(mq);
+        mq.position.copy(P(BOARD, mid, 6.4)); mq.rotation.y = -mid; scene.add(mq);
         const posters = [
           posterTex("#35575a", "#ecdfbd", ["שלגייה", "ושבעת", "הגמדים"], "הצגות 4 · 7 · 9.30", true),
           posterTex("#7a3d35", "#ecdfbd", ["יומן", "קולנוע"], "חדשות העולם", false),
           posterTex("#3c4a66", "#ecdfbd", ["הערב", "הצגה", "חגיגית"], "פרמיירה", false)
         ];
-        [.7, .79, .88].forEach((f, j) => {
+        [.22, .5, .78].forEach((f, j) => {
           const ang = s0 + (s1 - s0) * f;
           const pl = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 3.3), new THREE.MeshBasicMaterial({ map: posters[j], side: THREE.DoubleSide }));
-          pl.position.copy(P(front, ang, 6.9)); pl.rotation.y = -ang; scene.add(pl);
+          pl.position.copy(P(BOARD, ang, 3.0)); pl.rotation.y = -ang; scene.add(pl);
         });
       }
       bi++;
@@ -741,8 +795,12 @@
     $("card-x").addEventListener("click", closeCard); $("card-x").focus({ preventScroll: true });
     const v = $("vid");
     if (v) v.addEventListener("click", () => { v.outerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${c.video}?autoplay=1&rel=0" title="Here We Are, הפתיח" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`; });
+    setBar(true);
   }
-  function closeCard() { card.hidden = true; $("veil").hidden = true; card.innerHTML = ""; }
+  const barEl = document.querySelector(".bar"), grip = $("grip");
+  const setBar = (min) => { barEl.classList.toggle("min", min); grip.setAttribute("aria-expanded", String(!min)); };
+  grip.addEventListener("click", () => setBar(!barEl.classList.contains("min")));
+  function closeCard() { setBar(false); card.hidden = true; $("veil").hidden = true; card.innerHTML = ""; }
   $("veil").addEventListener("click", closeCard);
   const goHome = () => { closeCard(); if (gyro.on || gyro.listening) gyroOff(); setView("in"); };
   $("home").addEventListener("click", goHome);
@@ -806,6 +864,7 @@
       sg.rotation.y = Math.atan2(rig.position.x - sg.position.x, rig.position.z - sg.position.z);
       const d = Math.hypot(rig.position.x - sg.position.x, rig.position.y - sg.position.y, rig.position.z - sg.position.z);
       sg.scale.setScalar(clamp(d / 45, .5, 2.6)); sg.userData.m.opacity = 1;
+      sg.userData.stem.rotation.y = sg.rotation.y;
     });
     hotspots.forEach((h, i) => {
       const d = rig.position.distanceTo(h.pos), s = clamp(d * .05, 1.8, 9), ph = reduce ? 0 : ((now / 1000 + i * .6) % 1.8) / 1.8;
