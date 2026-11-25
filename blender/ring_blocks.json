@@ -1,0 +1,128 @@
+{
+ "_note": "Truth table, DRAFT. claim_* = from data/text/google_ai_research.txt (unverified unless listed in confirmed). Block matched by OSM street addresses. Photo check pending.",
+ "blocks": {
+  "A": {
+   "osm": 149270708,
+   "between": [
+    "Dizengoff N",
+    "Reines"
+   ],
+   "osm_levels": null,
+   "status_1940": "unverified",
+   "floors": null,
+   "roof_setback": null,
+   "photo": null,
+   "name": null,
+   "claim_1940": "not built (Gazit hotel 1948)",
+   "confirmed": [
+    "address Reines 1"
+   ],
+   "model": "v1 in blender/ring.py",
+   "model_note": "massing and facade parameters are interpretation, not yet matched to a photo"
+  },
+  "B": {
+   "osm": 495367849,
+   "between": [
+    "Reines",
+    "Zamenhof"
+   ],
+   "osm_levels": 5,
+   "status_1940": "built (style model v1, waiting for approval)",
+   "floors": null,
+   "roof_setback": null,
+   "photo": [
+    "219fab55 (1949, shape)",
+    "608ddd14"
+   ],
+   "name": "קולנוע אסתר",
+   "claim_1940": "built 1939, Y.+R. Magidovich, ground on columns + 4",
+   "floors_claim": 5,
+   "confirmed": [
+    "address Reines 2",
+    "hotel sites: Zamenhof"
+   ],
+   "ground_m": 3.7,
+   "floor_m": 3.2,
+   "ribbons": 3,
+   "tower": "Zamenhof end, confirmed by camera fit on 219fab55",
+   "model": "v1 in blender/ring.py"
+  },
+  "C": {
+   "osm": 495912832,
+   "between": [
+    "Zamenhof",
+    "Dizengoff S"
+   ],
+   "osm_levels": 4,
+   "status_1940": "unverified",
+   "floors": null,
+   "roof_setback": null,
+   "photo": null,
+   "name": null,
+   "claim_1940": "empty lot (HaMashbir 1957)",
+   "confirmed": [],
+   "warning": "source gives Pinsker 69 / Reines, which C does not touch; matched by elimination",
+   "model": "v1 in blender/ring.py",
+   "model_note": "massing and facade parameters are interpretation, not yet matched to a photo"
+  },
+  "D": {
+   "osm": 495912626,
+   "between": [
+    "Dizengoff S",
+    "Pinsker"
+   ],
+   "osm_levels": null,
+   "status_1940": "unverified",
+   "floors": null,
+   "roof_setback": null,
+   "photo": null,
+   "name": null,
+   "claim_1940": "built: Grinman house 1936, Feldman house 1935, ground + 3",
+   "floors_claim": 4,
+   "confirmed": [
+    "address Pinsker 72"
+   ],
+   "model": "v1 in blender/ring.py",
+   "model_note": "massing and facade parameters are interpretation, not yet matched to a photo"
+  },
+  "E": {
+   "osm": 495912569,
+   "between": [
+    "Pinsker",
+    "Ben Ami"
+   ],
+   "osm_levels": 6,
+   "status_1940": "unverified",
+   "floors": null,
+   "roof_setback": null,
+   "photo": null,
+   "name": null,
+   "claim_1940": "empty lot (Chen cinema 1949)",
+   "confirmed": [
+    "Rav Chen cinema POI next to E"
+   ],
+   "model": "v1 in blender/ring.py",
+   "model_note": "massing and facade parameters are interpretation, not yet matched to a photo"
+  },
+  "F": {
+   "osm": 296103022,
+   "between": [
+    "Ben Ami",
+    "Dizengoff N"
+   ],
+   "osm_levels": null,
+   "status_1940": "unverified",
+   "floors": null,
+   "roof_setback": null,
+   "photo": null,
+   "name": null,
+   "claim_1940": "built: Mirenberg house (Averbuch 1936), Yochanin houses 1935, ground + 3",
+   "floors_claim": 4,
+   "confirmed": [
+    "address Ben Ami 13"
+   ],
+   "model": "v1 in blender/ring.py",
+   "model_note": "massing and facade parameters are interpretation, not yet matched to a photo"
+  }
+ }
+}

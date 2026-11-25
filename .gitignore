@@ -7,3 +7,10 @@ node_modules/
 .vercel/
 .DS_Store
 Thumbs.db
+# תצלומי ארכיון והשוואות שכוללות אותם: לא לפרסום
+blender/preview/ref/
+blender/preview/*.png
+blender/preview/*_blend.jpg
+blender/*.blend
+blender/*.blend1
+facelift/.server.log

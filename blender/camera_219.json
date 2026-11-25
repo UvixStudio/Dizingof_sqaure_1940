@@ -1,0 +1,39 @@
+{
+ "best": "tower at Zamenhof",
+ "tower at Zamenhof": {
+  "cost": 19.4,
+  "pos": [
+   -45.9,
+   11.4,
+   20.9
+  ],
+  "yaw": 87.62,
+  "pitch": -13.82,
+  "focal_px": 1994,
+  "r_fence": 16.08,
+  "r_pool": 8.43,
+  "column_px": [
+   1241,
+   506
+  ],
+  "dist_to_column": 97.6
+ },
+ "tower at Reines": {
+  "cost": 277.3,
+  "pos": [
+   -28.6,
+   -25.2,
+   16.1
+  ],
+  "yaw": 33.05,
+  "pitch": -13.29,
+  "focal_px": 2078,
+  "r_fence": 12.44,
+  "r_pool": 6.4,
+  "column_px": [
+   1661,
+   476
+  ],
+  "dist_to_column": 88.3
+ }
+}

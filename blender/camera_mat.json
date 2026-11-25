@@ -1,0 +1,13 @@
+{
+ "street": "Dizengoff S",
+ "building_osm": 495912626,
+ "cost": 14.9,
+ "pos": [
+  -7.16,
+  47.57,
+  9.43
+ ],
+ "yaw": 171.24,
+ "pitch": -5.54,
+ "focal_px": 1872
+}

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>כיכר 1940: תצוגת בלנדר</title>
+<style>
+  body{margin:0;background:#12161c;color:#e8e4da;font:15px/1.5 system-ui,sans-serif}
+  header,section{padding:12px 16px}
+  h1{font-size:18px;margin:0} h2{font-size:15px;margin:0 0 8px}
+  #info{color:#9aa3ad;font-size:13px}
+  #live{width:100%;height:70vh;touch-action:none;background:#1b2129;border-radius:8px;overflow:hidden}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+  .pair figure{margin:0} .pair img{width:100%;aspect-ratio:16/9;object-fit:contain;background:#000;border-radius:6px}
+  figcaption{color:#9aa3ad;font-size:12px}
+  @media(max-width:700px){.pair{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><h1>כיכר דיזנגוף 1940: תצוגת בלנדר</h1><div id="info">טוען...</div><a href="site/" style="color:#9fc3ff">לאתר המלא</a></header>
+<section><h2>תלת מימד חי (קרוב לאיך שייראה בווב)</h2><div id="live"></div></section>
+<section><h2>רינדור בלנדר מול תמונות ארכיון (זוויות דומות, לא זהות)</h2><div id="pairs"></div></section>
+<script src="lib/three.min.js"></script>
+<script src="lib/GLTFLoader.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="preview.js"></script>
+</body>
+</html>
