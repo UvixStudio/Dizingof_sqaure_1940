@@ -1,0 +1,25 @@
+
+/* camera menu: one native single-select behind a camera icon */
+.cam-pick { position: relative; display: flex; align-items: center; flex: 1 1 200px; max-width: 22rem; background: var(--ink); color: var(--paper); border-radius: 10px; }
+.cam-pick svg { position: absolute; right: 12px; width: 22px; height: 22px; pointer-events: none; }
+.cam-pick::after { content: "▾"; position: absolute; left: 13px; font-size: .8rem; pointer-events: none; }
+.cam-pick select { -webkit-appearance: none; appearance: none; width: 100%; min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: inherit; font: 600 1rem var(--body); padding: 8px 44px 8px 34px; cursor: pointer; }
+.cam-pick option { color: var(--ink); background: var(--paper); }
+.cam-pick:focus-within { outline: 2px solid var(--wash); outline-offset: 2px; }
+
+/* nothing over the live picture is re-blurred or re-filtered every frame (the colour grade moved into the shaders) */
+#gl { filter: none; }
+.bar { background: rgba(236,226,204,.9); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.title h1 { background: rgba(29,42,90,.76); -webkit-backdrop-filter: none; backdrop-filter: none; }
+.card { background: rgba(17,27,58,.94); -webkit-backdrop-filter: none; backdrop-filter: none; }
+
+.fps { position: fixed; z-index: 9; top: 84px; left: 8px; max-width: calc(100% - 16px); direction: ltr; padding: 3px 7px; border-radius: 6px; background: rgba(0,0,0,.65); color: #fff; font: 12px/1.4 ui-monospace, Consolas, monospace; pointer-events: none; }
+
+/* loading veil */
+.loading { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: var(--paper); transition: opacity .6s ease; }
+.loading.done { opacity: 0; pointer-events: none; }
+.loading .plate { text-align: center; font: 700 1.6rem/1.2 var(--display); color: #fff; padding: 12px 28px 14px; background: #1d2a5a; border-radius: 10px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.8), inset 0 0 0 5px #1d2a5a, inset 0 0 0 6px rgba(255,255,255,.4), 0 6px 20px rgba(20,16,34,.22); }
+.loading .plate small { display: block; margin-top: 3px; font-size: .85rem; font-weight: 600; opacity: .9; }
+.load-track { width: min(260px, 70vw); height: 6px; border-radius: 3px; overflow: hidden; background: rgba(43,41,37,.14); }
+.load-track i { display: block; width: 100%; height: 100%; background: #1d2a5a; transform: scaleX(0); transform-origin: right center; transition: transform .25s linear; }
+.loading p { margin: 0; font-size: .9rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }

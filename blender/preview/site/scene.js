@@ -12,10 +12,42 @@
     city: [0xece6d9, 0xe6dfd0, 0xefe9de, 0xe2dccd]
   };
 
-  // ---------- renderer ----------
+  // ---------- picture quality for the device ----------
+  // Antialiasing is almost free on phone GPUs and very expensive on laptop integrated graphics
+  // (measured on Iris Xe at 1080p: 69 ms a frame with it, 32 ms without). It can only be chosen when the context is made.
+  const coarse = matchMedia("(pointer: coarse)").matches;
+  const metered = /[?&]fps\b/.test(location.search);                  // add ?fps to the address
+  const gpuName = coarse && !metered ? "" : (() => {                    // phones always keep antialiasing: no need to ask
+    const g = document.createElement("canvas").getContext("webgl"); if (!g) return "";
+    const e = g.getExtension("WEBGL_debug_renderer_info"), n = e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : "";
+    const lose = g.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
+    return String(n);
+  })();
+  const weak = !coarse && /intel|uhd|iris|swiftshader|llvmpipe|basic render/i.test(gpuName);
+  let ratio = Math.min(window.devicePixelRatio || 1, weak ? 1.25 : 2);
+  // if frames stay slow, draw fewer pixels (only ever downwards, so the picture does not keep changing)
+  const pace = { sum: 0, n: 0, slow: 0, first: null, done: false, from: performance.now() + 4000, floor: Math.min(ratio, coarse ? 1.2 : .8) };
+  const meter = metered ? document.body.appendChild(document.createElement("div")) : null;
+  if (meter) meter.className = "fps";
+  function adapt(ms, now) {
+    if (now < pace.from || ms > 250) return;                          // loading, or a tab in the background
+    pace.sum += ms; if (++pace.n < 40) return;
+    const avg = pace.sum / pace.n; pace.sum = pace.n = 0;
+    pace.slow = avg > 24 ? pace.slow + 1 : 0;
+    if (pace.slow >= 2 && !pace.done) {
+      pace.slow = 0;
+      if (ratio > pace.floor) { pace.first = pace.first || { avg, ratio }; ratio = Math.max(pace.floor, ratio * .85); renderer.setPixelRatio(ratio); }
+      // all the way down and no faster (a phone saving battery caps at 30 fps): the pixels were not the problem, put them back
+      else if (pace.first && avg > pace.first.avg * .92) { ratio = pace.first.ratio; renderer.setPixelRatio(ratio); pace.done = true; }
+    }
+    if (meter) meter.textContent = `${(1000 / avg).toFixed(0)} fps | x${ratio.toFixed(2)} | ${weak ? "no AA" : "AA"} | ${gpuName}`;
+  }
+
+// ---------- renderer ----------
   const canvas = $("gl");
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !weak });
+  renderer.setPixelRatio(ratio);
+  THREE.ShaderChunk.fog_fragment += "\ngl_FragColor.rgb = clamp(mat3(0.87496,0.07231,0.06063,0.17522,0.95862,0.13959,0.03588,0.03269,0.82307) * gl_FragColor.rgb + (-0.01500), 0.0, 1.0);";   // colour grade, once per pixel inside the shaders
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   // no filmic tone mapping: it washed the colours out; contrast comes from the sun and shadows instead
   const HAZE = 0xc2c6cd;
@@ -697,60 +729,136 @@
     walk: { pos: P(45, D(165), 1.6),  yaw: D(15), pitch: D(-1) },        // sidewalk outside the circle
     roof: { pos: P(FACADE + .6, D(120), 19.5), yaw: D(60), pitch: D(-22) }   // on a roof edge, like the archive photos
   };
+  // one list drives the camera menu: a new camera is one more line (target = object name of a moving thing in the model)
+  const CAMS = [
+    { k: "in", label: "בתוך הכיכר" },
+    { k: "walk", label: "מהמדרכה" },
+    { k: "roof", label: "מגג" },
+    { k: "top", label: "מבט על" },
+    { k: "car", label: "מאחורי מכונית", target: "car_coupe", dist: 8.5, el: .36, fov: 62, road: [36.6, 45.2] }
+  ];
   const HINT = "גרור כדי להסתובב. צביטה לזום.", HINT_TOP = "גרור כדי להקיף את הכיכר. צביטה לקרב ולהרחיק.";
+  const HINT_RIDE = "נוסעים סביב הכיכר. גרור כדי להסתכל מסביב לרכב, צביטה לקרב ולהרחיק.";
   const look = { yaw: 0, pitch: 0 }, cam = { mode: "fp", az: D(20), el: D(46), dist: 135 };
-  const KEYS = ["in", "walk", "roof", "top"];
+  const ride = { def: null, yaw: 0, el: 0, dist: 0, t: 0, from: { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: 70 } };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const setPressed = (k) => KEYS.forEach((x) => $("v-" + x).setAttribute("aria-pressed", String(x === k)));
+  const camSelect = $("cam-select");
+  camSelect.innerHTML = CAMS.map((c) => `<option value="${c.k}">${c.label}</option>`).join("") + '<option value="free" hidden disabled>מבט חופשי</option>';
+  const setPressed = (k) => { camSelect.value = k || "free"; };
   let flight = null;
   function setView(k) {
-    flight = null;
-    if (k === "top") { if (gyro.on || gyro.listening) gyroOff(); cam.mode = "orbit"; camera.fov = 55; camera.updateProjectionMatrix(); setPressed(k); $("hint").textContent = HINT_TOP; return; }
+    const c = CAMS.find((x) => x.k === k);
+    flight = null; stopMotion(); setPressed(k);
+    if (k === "top") { if (gyro.on || gyro.listening) gyroOff(); cam.mode = "orbit"; camera.fov = 55; camera.updateProjectionMatrix(); $("hint").textContent = HINT_TOP; return; }
+    if (c.target) {
+      if (gyro.on || gyro.listening) gyroOff();
+      camera.getWorldQuaternion(ride.from.quat); ride.from.pos.copy(rig.position); ride.from.fov = camera.fov;
+      rig.rotation.set(0, 0, 0); camera.quaternion.copy(ride.from.quat);
+      Object.assign(ride, { def: c, yaw: 0, el: c.el, dist: c.dist, t: 0 });
+      cam.mode = "ride"; $("hint").textContent = HINT_RIDE; return;
+    }
     cam.mode = "fp"; const v = VIEWS[k];
     if (!gyro.on) rig.rotation.set(0, 0, 0);
     rig.position.copy(v.pos); look.yaw = v.yaw; look.pitch = v.pitch;
-    camera.fov = 70; camera.updateProjectionMatrix(); setPressed(k);
+    camera.fov = 70; camera.updateProjectionMatrix();
     if (!gyro.on) $("hint").textContent = HINT;
   }
-  KEYS.forEach((k) => $("v-" + k).addEventListener("click", () => setView(k)));
+  camSelect.addEventListener("change", () => { closeCard(); setView(camSelect.value); camSelect.blur(); });
   function applyOrbit() {
     const tgt = new THREE.Vector3(0, 3, 0), c = Math.cos(cam.el);
     const pos = new THREE.Vector3(Math.sin(cam.az) * c, Math.sin(cam.el), Math.cos(cam.az) * c).multiplyScalar(cam.dist).add(tgt);
     rig.rotation.set(0, 0, 0); rig.position.copy(pos);
     const f = tgt.clone().sub(pos).normalize(); camera.rotation.set(Math.asin(f.y), Math.atan2(-f.x, -f.z), 0);
   }
+  // behind and above a vehicle that circles the square; looked up by name because the model can reload
+  const Y_AXIS = new THREE.Vector3(0, 1, 0), back = new THREE.Vector3(), eye = new THREE.Vector3(), aim = new THREE.Quaternion();
+  function updateRide(dt) {
+    const m = movers.find((x) => x.o.name === ride.def.target);
+    if (!m) return;                                                   // model still loading: stay where we are
+    const p = m.o.position, s = Math.sign(m.w);
+    back.set(-p.z * s, 0, p.x * s).normalize().applyAxisAngle(Y_AXIS, ride.yaw);     // against the driving direction
+    const flat = ride.dist * Math.cos(ride.el);
+    eye.set(p.x + back.x * flat, p.y + 1.1 + ride.dist * Math.sin(ride.el), p.z + back.z * flat);
+    // never leave the road (trees inside it, buildings outside): when swung to the side, rise over the car instead
+    const r = Math.hypot(eye.x, eye.z), onRoad = clamp(r, ride.def.road[0], ride.def.road[1]);
+    if (onRoad !== r) {
+      eye.x *= onRoad / r; eye.z *= onRoad / r;
+      const over = Math.hypot(eye.x - p.x, eye.z - p.z);
+      eye.y = Math.max(eye.y, p.y + 1.1 + Math.sqrt(Math.max(0, ride.dist * ride.dist - over * over)));
+    }
+    const past = 4.5 * Math.max(0, Math.cos(ride.yaw));               // from behind: aim past the car. From the side: at it
+    const dx = p.x - back.x * past - eye.x, dy = p.y + 1.3 - eye.y, dz = p.z - back.z * past - eye.z;
+    camera.rotation.set(Math.atan2(dy, Math.hypot(dx, dz)), Math.atan2(-dx, -dz), 0);
+    ride.t += dt;
+    const u = reduce ? 1 : Math.min(1, ride.t / 1.1);
+    if (u < 1) {                                                      // glide in from the previous camera
+      const e = ease(u);
+      aim.copy(camera.quaternion); camera.quaternion.copy(ride.from.quat).slerp(aim, e);
+      rig.position.lerpVectors(ride.from.pos, eye, e);
+    } else rig.position.copy(eye);
+    const fov = ride.from.fov + (ride.def.fov - ride.from.fov) * ease(u);
+    if (Math.abs(camera.fov - fov) > .01) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  }
 
-  // ---------- pointer: drag, pinch, tap ----------
-  const ptrs = new Map(); let tap = null, pinch = null;
+  // ---------- pointer: drag with a short glide, pinch, tap ----------
+  // The handlers only collect movement. Each frame eases it into the camera, so uneven events never show as steps.
+  const motion = { x: 0, y: 0, z: 0, vx: 0, vy: 0 };   // x, y: radians still to apply. z: zoom (log) still to apply. v: glide speed
+  const stopMotion = () => { motion.x = motion.y = motion.z = motion.vx = motion.vy = 0; };
+  const ptrs = new Map(); let tap = null, pinch = null, trail = [];
   const pdist = () => { const [a, b] = [...ptrs.values()]; return Math.hypot(a.x - b.x, a.y - b.y) || 1; };
   canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); flight = null;
+    stopMotion(); trail = [];                                         // a finger on the screen catches the glide
     if (ptrs.size === 1) tap = { t: performance.now(), moved: 0 };
-    else { tap = null; pinch = { d: pdist(), fov: camera.fov, dist: cam.dist }; }
+    else { tap = null; pinch = { d: pdist() }; }
   });
   canvas.addEventListener("pointermove", (e) => {
     const p = ptrs.get(e.pointerId); if (!p) return;
     const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
-    if (ptrs.size === 2 && pinch) {
-      const k = pinch.d / pdist();            // fingers apart: k < 1, zoom in
-      if (cam.mode === "orbit") cam.dist = clamp(pinch.dist * k, 18, 300); else { camera.fov = clamp(pinch.fov * k, 28, 85); camera.updateProjectionMatrix(); }
-      return;
-    }
+    if (ptrs.size === 2 && pinch) { const d = pdist(); motion.z += Math.log(pinch.d / d); pinch.d = d; return; }   // fingers apart: zoom in
+    if (ptrs.size !== 1) return;
     if (tap) tap.moved += Math.hypot(dx, dy);
-    if (cam.mode === "orbit") { cam.az -= dx * .006; cam.el = clamp(cam.el + dy * .006, D(8), D(88)); return; }
-    const k = D(camera.fov) / innerHeight;
-    if (gyro.on) { rig.rotation.y += dx * k; return; }       // with sensors, dragging turns the whole scene
-    look.yaw += dx * k; look.pitch = clamp(look.pitch + dy * k, -1.4, 1.4);
+    // around-an-object cameras turn by a fixed rate, the standing view follows the field of view (faster for a thumb)
+    const k = cam.mode === "fp" ? D(camera.fov) / innerHeight * (e.pointerType === "touch" ? 1.4 : 1.2) : .006;
+    const x = dx * k, y = dy * k * (cam.mode === "fp" ? .8 : 1);
+    motion.x += x; motion.y += y;
+    trail.push({ t: e.timeStamp, x, y }); while (trail.length > 1 && e.timeStamp - trail[0].t > 100) trail.shift();
   });
   const endPtr = (e, cancel) => {
-    if (ptrs.size === 1 && tap && !cancel && tap.moved < 8 && performance.now() - tap.t < 450) handleTap(e.clientX, e.clientY);
-    ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; tap = null;
+    const single = ptrs.size === 1;
+    if (single && tap && !cancel && tap.moved < 8 && performance.now() - tap.t < 450) handleTap(e.clientX, e.clientY);
+    else if (single && !cancel && !pinch && !reduce && trail.length > 1 && e.timeStamp - trail[trail.length - 1].t < 80) {
+      const span = Math.max(16, e.timeStamp - trail[0].t) / 1000, rest = trail.slice(1);
+      motion.vx = clamp(rest.reduce((a, q) => a + q.x, 0) / span, -2, 2);
+      motion.vy = clamp(rest.reduce((a, q) => a + q.y, 0) / span, -1.2, 1.2);
+    }
+    ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; tap = null; trail = [];
   };
   canvas.addEventListener("pointerup", (e) => endPtr(e, false)); canvas.addEventListener("pointercancel", (e) => endPtr(e, true));
   canvas.addEventListener("wheel", (e) => {
-    e.preventDefault();
-    if (cam.mode === "orbit") cam.dist = clamp(cam.dist * (1 + e.deltaY * .001), 18, 300); else { camera.fov = clamp(camera.fov * (1 + e.deltaY * .001), 28, 85); camera.updateProjectionMatrix(); }
+    e.preventDefault(); flight = null;
+    motion.z += clamp(e.deltaY * (e.deltaMode === 1 ? 33 : 1), -240, 240) * .001;
   }, { passive: false });
+  function applyMotion(dt) {
+    if (!ptrs.size && (motion.vx || motion.vy)) {
+      motion.x += motion.vx * dt; motion.y += motion.vy * dt;
+      const f = Math.exp(-dt / .25); motion.vx *= f; motion.vy *= f;
+      if (Math.hypot(motion.vx, motion.vy) < .02) motion.vx = motion.vy = 0;
+    }
+    const a = reduce ? 1 : 1 - Math.exp(-dt / .045);
+    const x = motion.x * a, y = motion.y * a, z = Math.abs(motion.z) < 1e-4 ? motion.z : motion.z * a;
+    motion.x -= x; motion.y -= y; motion.z -= z;
+    if (cam.mode === "orbit") { cam.az -= x; cam.el = clamp(cam.el + y, D(8), D(88)); cam.dist = clamp(cam.dist * Math.exp(z), 18, 300); return; }
+    if (cam.mode === "ride") { ride.yaw -= x; ride.el = clamp(ride.el + y, .06, 1.25); ride.dist = clamp(ride.dist * Math.exp(z), 5, 24); return; }
+    if (gyro.on) rig.rotation.y += x;                                 // with sensors, dragging turns the whole scene
+    else { look.yaw += x; look.pitch = clamp(look.pitch + y, -1.4, 1.4); }
+    if (z) { camera.fov = clamp(camera.fov * Math.exp(z), 28, 85); camera.updateProjectionMatrix(); }
+  }
+  function updateCamera(dt) {
+    applyMotion(dt);
+    if (cam.mode === "orbit") applyOrbit(); else if (cam.mode === "ride") updateRide(dt);
+    else if (gyro.on && gyro.e) applyGyro(dt); else camera.rotation.set(look.pitch, look.yaw, 0);
+  }
 
   // ---------- phone orientation (can be switched off again) ----------
   const gyro = { on: false, abs: false, e: null, listening: false };
@@ -761,10 +869,11 @@
     gyro.e = e;
     if (!gyro.on) { gyro.on = true; gyro.abs = absolute; rig.rotation.y = 0; onGyroState(); }
   }
-  function applyGyro() {
+  function applyGyro(dt) {
     const e = gyro.e, o = D((screen.orientation && screen.orientation.angle) || window.orientation || 0);
     eu.set(D(e.beta), D(e.alpha), -D(e.gamma), "YXZ");
-    camera.quaternion.copy(q.setFromEuler(eu).multiply(q1).multiply(q0.setFromAxisAngle(zee, -o)));
+    q.setFromEuler(eu).multiply(q1).multiply(q0.setFromAxisAngle(zee, -o));
+    camera.quaternion.slerp(q, 1 - Math.exp(-dt / .06));              // takes the tremor out of the raw sensor
   }
   function gyroOff() {
     removeEventListener("deviceorientationabsolute", oriAbs); removeEventListener("deviceorientation", oriRel);
@@ -782,8 +891,8 @@
     try {
       const DOE = window.DeviceOrientationEvent;
       if (DOE && typeof DOE.requestPermission === "function" && (await DOE.requestPermission()) !== "granted") throw 0;
-      if (cam.mode === "orbit") setView("in");
-      flight = null; gyro.listening = true;
+      if (cam.mode !== "fp") setView("in");
+      flight = null; stopMotion(); gyro.listening = true;
       if ("ondeviceorientationabsolute" in window) addEventListener("deviceorientationabsolute", oriAbs); else addEventListener("deviceorientation", oriRel);
       setTimeout(() => { if (!gyro.on) $("hint").textContent = "החיישנים לא זמינים כאן. בטלפון, פתח את הקובץ מכתובת https."; }, 1500);
     } catch (_) { $("hint").textContent = "אין הרשאה לחיישנים. גרור כדי להסתובב."; }
@@ -795,7 +904,7 @@
                                      : "כוון את הטלפון לצפון ולחץ ׳יישור לצפון׳. גרירה מסובבת את הסצנה.";
   }
 
-  $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden = !n.hidden; $("info-btn").setAttribute("aria-expanded", String(!n.hidden)); });
+$("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden = !n.hidden; $("info-btn").setAttribute("aria-expanded", String(!n.hidden)); });
   $("notes").addEventListener("click", () => { $("notes").hidden = true; $("info-btn").setAttribute("aria-expanded", "false"); });
 
   // ---------- hotspots: markers, fly-to, pop-up cards ----------
@@ -870,14 +979,14 @@
     const c = CARDS[h.key];
     let html = `<div class="head"><div><h2 id="card-title">${esc(c.title)}</h2>${c.by ? `<p class="by">${esc(c.by)}</p>` : ""}<p class="sub">${esc(c.sub)}</p></div><button class="x" id="card-x" aria-label="סגירה">✕</button></div>`;
     (c.figs || []).forEach((f) => { html += `<figure class="${f.port ? "port" : ""}"><img src="${f.src}" alt="${esc(f.alt)}"><figcaption>${esc(f.cap)}</figcaption></figure>`; });
-    if (c.video) html += `<button class="vid" id="vid" aria-label="נגן את הפתיח" style="background-image:url(https://img.youtube.com/vi/${c.video}/hqdefault.jpg)"><span>▶</span></button>`;
+    if (c.video) html += `<button class="vid" id="vid" aria-label="נגן את הסרטון" style="aspect-ratio:${c.ratio || '16 / 9'};background-image:url(https://img.youtube.com/vi/${c.video}/hqdefault.jpg)"><span>▶</span></button>`;
     c.body.forEach((t) => { html += `<p>${esc(t)}</p>`; });
     html += `<ul class="links">${c.links.map((l) => `<li><a href="${l.u}" target="_blank" rel="noopener">${esc(l.t)} ↗</a></li>`).join("")}</ul>`;
     if (c.credit) html += `<p class="credit">${esc(c.credit)}</p>`;
     card.innerHTML = html; card.scrollTop = 0; card.hidden = false; $("veil").hidden = false; $("notes").hidden = true;
     $("card-x").addEventListener("click", closeCard); $("card-x").focus({ preventScroll: true });
     const v = $("vid");
-    if (v) v.addEventListener("click", () => { v.outerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${c.video}?autoplay=1&rel=0" title="Here We Are, הפתיח" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`; });
+    if (v) v.addEventListener("click", () => { v.outerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${c.video}?autoplay=1&rel=0" title="${esc(c.title)}" style="aspect-ratio:${c.ratio || '16 / 9'}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`; });
     setBar(true);
   }
   const barEl = document.querySelector(".bar"), grip = $("grip");
@@ -894,7 +1003,7 @@
     closeCard(); if (gyro.on || gyro.listening) gyroOff();
     const f = new THREE.Vector3(); camera.getWorldDirection(f);
     const from = { pos: rig.position.clone(), yaw: Math.atan2(-f.x, -f.z), pitch: Math.asin(clamp(f.y, -1, 1)), fov: camera.fov };
-    cam.mode = "fp"; rig.rotation.set(0, 0, 0); look.yaw = from.yaw; look.pitch = from.pitch; setPressed(null); $("hint").textContent = HINT;
+    stopMotion(); cam.mode = "fp"; rig.rotation.set(0, 0, 0); look.yaw = from.yaw; look.pitch = from.pitch; setPressed(null); $("hint").textContent = HINT;
     let dy = h.cam.yaw - from.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
     flight = { t0: performance.now(), dur: reduce ? 1 : 1300, from, to: { pos: h.cam.pos, yaw: from.yaw + dy, pitch: h.cam.pitch, fov: 58 }, h };
   }
@@ -922,14 +1031,14 @@
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let last = performance.now();
   function frame(now) {
-    const dt = Math.min(.05, (now - last) / 1000); last = now;
+    const ms = now - last, dt = clamp(ms / 1000, 0, .1); last = now; adapt(ms, now); moveTraffic(now, dt);
     if (flight) {
       const u = clamp((now - flight.t0) / flight.dur, 0, 1), e = ease(u), a = flight.from, b = flight.to;
       rig.position.lerpVectors(a.pos, b.pos, e); look.yaw = a.yaw + (b.yaw - a.yaw) * e; look.pitch = a.pitch + (b.pitch - a.pitch) * e;
       camera.fov = a.fov + (b.fov - a.fov) * e; camera.updateProjectionMatrix();
       if (u >= 1) { const h = flight.h; flight = null; openCard(h); }
     }
-    if (cam.mode === "orbit") applyOrbit(); else if (gyro.on && gyro.e) applyGyro(); else camera.rotation.set(look.pitch, look.yaw, 0);
+    updateCamera(dt);
     if (!reduce) {
       waterMat.uniforms.uT.value += dt;
       for (let i = 0; i < JET; i++) {
@@ -959,7 +1068,54 @@
   grain(); resize(); setView("in");
   traffic.forEach((c) => { c.g.position.copy(P(c.r, c.t, 0)); c.g.rotation.y = Math.PI - c.t; });
   walkers.forEach((w) => { w.g.position.copy(P(w.r, w.t, 0)); });
-  // ---------- replace the procedural geometry with the Blender model ----------
+  // ---------- loading: one veil until the whole square is ready ----------
+  // The model comes gzipped (blender/pack_web.py) and is unpacked here. Old browsers get the plain file.
+  const veilLoad = $("loading");
+  let shown = false;                                                    // true once the first model is on screen
+  function progress(part, text) {
+    if (shown) return;
+    $("load-bar").style.transform = `scaleX(${part})`; $("load-pct").textContent = Math.round(part * 100) + "%";
+    if (text) $("load-text").textContent = text;
+  }
+  const painted = () => new Promise((ok) => { requestAnimationFrame(() => setTimeout(ok, 0)); setTimeout(ok, 300); });   // let the screen catch up
+  async function download(url, size) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(url + " " + res.status);
+    if (!res.body || !res.body.getReader) return res.arrayBuffer();
+    const total = +res.headers.get("content-length") || size, reader = res.body.getReader(), parts = [];
+    for (let got = 0; ;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      parts.push(value); got += value.length; progress(.9 * Math.min(1, got / total));
+    }
+    return new Blob(parts).arrayBuffer();
+  }
+  async function modelBytes(stamp) {
+    if (window.DecompressionStream) {
+      try {
+        let buf = await download("../kikar_web.glb.gz?t=" + stamp, 2465268);
+        const sig = new Uint8Array(buf, 0, 2);                          // a server may already have unpacked it on the way
+        if (sig[0] === 0x1f && sig[1] === 0x8b) buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+        return buf;
+      } catch (e) { console.warn("packed model failed, using the plain one", e); }
+    }
+    return download("../kikar.glb?t=" + stamp, 9120284);
+  }
+  async function reveal() {                                             // shaders compiled and one frame drawn: lift the veil
+    if (shown) return;
+    progress(.98, "מדליקים את האור"); await painted();
+    renderer.compile(scene, camera); await painted(); await painted();
+    progress(1); shown = true;
+    veilLoad.classList.add("done"); setTimeout(() => { veilLoad.hidden = true; }, 700);
+  }
+  function loadFailed(e) {
+    console.error(e);
+    if (shown) return;                                                  // a later reload failed: keep what is on screen
+    $("load-text").textContent = "הטעינה נכשלה. בדקו את החיבור."; $("load-pct").textContent = "";
+    $("load-again").hidden = false; $("load-again").onclick = () => location.reload();
+  }
+
+// ---------- replace the procedural geometry with the Blender model ----------
   const POOL_R = 8.4, WATER_Z = 0.17;                   // calibrated, see data/research_notes.md
   water.geometry.dispose(); water.geometry = new THREE.CircleGeometry(POOL_R - .05, 80).rotateX(-Math.PI / 2); water.position.y = WATER_Z;
   waterMat.vertexShader = "varying vec3 vP; varying vec3 vW; void main(){ vP = position; vec4 w = modelMatrix*vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }";
@@ -978,6 +1134,7 @@
       col = mix(col, vec3(.90,.93,.94), clamp(foam*(.75 + .25*c), 0.0, 1.0));
       col *= mix(.78, 1.0, smoothstep(8.4, 7.2, r));
       gl_FragColor = vec4(col, 1.0);
+      gl_FragColor.rgb = clamp(mat3(0.87496,0.07231,0.06063,0.17522,0.95862,0.13959,0.03588,0.03269,0.82307) * gl_FragColor.rgb + (-0.01500), 0.0, 1.0);
     }`;
   waterMat.needsUpdate = true;
   // fountain as in MAT-22292: tall central column, an umbrella of streams, thin jets from the rim inward
@@ -1009,8 +1166,11 @@
   sun.position.set(-80, 53, 29);                      // bearing 250, 32 degrees, as in Blender
   Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70 }); sun.shadow.camera.updateProjectionMatrix();
   sun.intensity = .88; sun.shadow.bias = -.0004; sun.shadow.normalBias = .35; sun.shadow.radius = 3;
-  function loadModel(t) {
-    new THREE.GLTFLoader().load("../kikar.glb?t=" + t, (g) => {
+  async function loadModel(t) {
+    let buf;
+    try { buf = await modelBytes(t); } catch (e) { loadFailed(e); return; }
+    progress(.93, "מרכיבים את הכיכר"); await painted();
+    new THREE.GLTFLoader().parse(buf, "../", (g) => {
       const old = scene.getObjectByName("blender");
       if (old) { scene.remove(old); old.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); }
       g.scene.name = "blender";
@@ -1032,7 +1192,9 @@
       scene.add(g.scene);
       collect(g.scene);
       merge(g.scene);
-    });
+      shadows(g.scene);
+      reveal();
+    }, loadFailed);
   }
   // ---------- building labels (cream plates, so they are not mistaken for street names) + Esther card ----------
   const LABELS = { B: ["קולנוע כיכר דיזנגוף", "לימים קולנוע אסתר"], D: ["בתי פלדמן וגרינמן", "1935-36 · המיקום לאימות"],
@@ -1145,26 +1307,25 @@
     });
   }
   camera.near = .4; camera.updateProjectionMatrix();
-  window.__render = () => renderer.info.render;      // for checking the load from the console
-  let before = null;
-  function drive(now) {
-    const dt = before === null ? 0 : Math.min((now - before) / 1000, .05); before = now;
-    if (!reduce) movers.forEach((m) => {
+  window.__kikar.renderer = renderer; window.__kikar.camera = camera;      // for checking the load from the console
+  function moveTraffic(now, dt) {
+    if (reduce && cam.mode !== "ride") return;            // a ride was asked for, so it drives even with reduced motion
+    movers.forEach((m) => {
       m.o.position.applyAxisAngle(UP, m.w * dt);
       m.o.quaternion.premultiply(turn.setFromAxisAngle(UP, m.w * dt));
       if (m.bob) m.o.position.y = m.y + Math.abs(Math.sin(now / 160 + m.ph)) * .035;
     });
-    requestAnimationFrame(drive);
+    placeShadows();
   }
-  requestAnimationFrame(drive);
-  const BUILD = 1795649828;
+  const BUILD = 1795692568;
   setInterval(async () => {
     try {
       const v = await (await fetch("build.json?t=" + Date.now(), { cache: "no-store" })).json();
       if (v.build > BUILD) location.replace("index.html?v=" + v.build);
     } catch (e) { /* hosted copy or offline: keep what is loaded */ }
   }, 5000);
-  let stamp = null;
+  let stamp = 1795692549;
+  loadModel(stamp);                                   // at once, the check below is only for rebuilds
   (async function poll() {
     try {
       const s = await (await fetch("../stamp.json?t=" + Date.now(), { cache: "no-store" })).json();
@@ -1172,5 +1333,70 @@
     } catch (e) { /* nothing published yet */ }
     setTimeout(poll, 4000);
   })();
-  requestAnimationFrame(frame);
+  // ---------- shadows ----------
+  // The town never moves, so its shadow map is drawn once. Vehicles and people get their own flat shadow,
+  // their shape pressed onto the ground along the same sun: no second pass over the whole model every frame.
+  let casts = [];
+  const press = new THREE.Matrix4(), local = new THREE.Matrix4(), pt = new THREE.Vector3();
+  function shadows(root) {
+    const mat = new THREE.MeshBasicMaterial({ color: 0x1b2130, transparent: true, opacity: .38, depthWrite: false, side: THREE.DoubleSide,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+      stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc, stencilZPass: THREE.ReplaceStencilOp });   // overlaps darken once
+    root.updateMatrixWorld(true);
+    casts = movers.map((m) => {
+      const pos = [], index = [], inv = new THREE.Matrix4().copy(m.o.matrixWorld).invert();
+      m.o.traverse((c) => {
+        if (!c.isMesh) return;
+        c.castShadow = false;
+        const p = c.geometry.attributes.position, ix = c.geometry.index, base = pos.length / 3;
+        local.multiplyMatrices(inv, c.matrixWorld);
+        for (let i = 0; i < p.count; i++) { pt.set(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(local); pos.push(pt.x, pt.y, pt.z); }
+        for (let i = 0, n = ix ? ix.count : p.count; i < n; i++) index.push(base + (ix ? ix.getX(i) : i));
+      });
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(index);
+      const s = new THREE.Mesh(geo, mat); s.matrixAutoUpdate = false; s.frustumCulled = false; s.renderOrder = -1; root.add(s);
+      return { s, o: m.o, g: m.y + .012 };
+    });
+    renderer.shadowMap.autoUpdate = false; renderer.shadowMap.needsUpdate = true;
+    placeShadows();
+  }
+  function placeShadows() {
+    const L = sun.position, x = L.x / L.y, z = L.z / L.y;
+    casts.forEach((c) => {
+      c.o.updateMatrixWorld();
+      press.set(1, -x, 0, c.g * x,  0, 0, 0, c.g,  0, -z, 1, c.g * z,  0, 0, 0, 1);
+      c.s.matrix.multiplyMatrices(press, c.o.matrixWorld); c.s.matrixWorldNeedsUpdate = true;
+    });
+  }
+  canvas.addEventListener("webglcontextrestored", () => { renderer.shadowMap.needsUpdate = true; });
+
+// ---------- point of interest: the opening of the square, January 1938 ----------
+  // Facts: municipal announcement no. 4 (data/research_images/3623f3ae), the film's own captions, and the Israel Film Archive record.
+  CARDS.opening = {
+    title: "חנוכת כיכר צינה דיזנגוף", by: "26 בינואר 1938", sub: "הסרט: יומן כרמל, נתן אקסלרוד, ינואר 1938",
+    video: "SdrtVZkEUTg", ratio: "4 / 3",
+    body: [
+      "הכיכר נחנכה בטקס פומבי ביום רביעי, כ״ד בשבט תרצ״ח, ביום הזיכרון השמיני לצינה דיזנגוף, אשתו של ראש העירייה המנוח מאיר דיזנגוף.",
+      "לפי המודעה העירונית על הטקס, העירייה נטעה וסידרה את הכיכר לזכרה, בעזרת תרומות של עובדי העירייה ושל בעלי הבתים והמגרשים שמסביב. הטקס נקבע לשעה 16:30, והכניסה למוזמנים הייתה מרחוב דיזנגוף, מצד רחוב המלך ג׳ורג׳.",
+      "הסרט נמשך קצת יותר מדקה. רואים בו את הכיכר ביום ובלילה: דקל צעיר, ספסלים לבנים, מבט מלמעלה אל הבריכה, והמזרקה מוארת בחושך.",
+      "בכתוביות נאמר שהכיכר ״נחנכה השבוע ברוב עם״, שניטעו בה תמרים שהובאו מגן רחל בכנרת, ושהוצבו בה 28 ספסלים לבנים, מזרקה ופנסים."
+    ],
+    credit: "מקורות: מודעה עירונית מס׳ 4 של עיריית תל אביב, ארכיון הסרטים הישראלי, וכתוביות הסרט (אוסף יומני כרמל, נתן אקסלרוד).",
+    links: [
+      { t: "הסרט ביוטיוב", u: "https://youtu.be/SdrtVZkEUTg" },
+      { t: "ארכיון הסרטים הישראלי: רשומת הסרט", u: "https://jfc.org.il/news_journal/27482-2/93669-2/" },
+      { t: "ויקיפדיה: כיכר צינה דיזנגוף", u: WIKI_SQ }
+    ]
+  };
+  // over the near side of the pool: in the middle of the square, and already in sight in the opening view
+  addHotspot("opening", "play", P(7.5, D(230), 3.6), P(18.5, D(222), 1.7), P(2, D(230), 3.4));
+  hotspots[hotspots.length - 1].sp.material.map = canvasTex(128, 128, (c) => {
+    c.fillStyle = "rgba(236,223,192,.96)"; c.beginPath(); c.arc(64, 64, 60, 0, 7); c.fill();
+    c.fillStyle = "#4a3425"; c.beginPath(); c.arc(64, 64, 51, 0, 7); c.fill();
+    c.fillStyle = "#f0e3c2"; c.beginPath(); c.moveTo(52, 26); c.lineTo(52, 62); c.lineTo(82, 44); c.closePath(); c.fill();
+    c.direction = "ltr"; c.font = "700 36px " + SERIF; c.fillText("1938", 64, 86);
+  });
+
+requestAnimationFrame(frame);
 })();

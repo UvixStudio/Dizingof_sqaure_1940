@@ -16,10 +16,17 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://dizingof-sqaure-1940.vercel.app/assets/og.jpg?v=2">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Assistant:wght@400;600;700&display=swap">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=1795692568">
+<link rel="preload" as="fetch" crossorigin href="../kikar_web.glb.gz?t=1795692549">
 </head>
 <body>
 <div dir="rtl">
+  <div class="loading" id="loading" role="status">
+    <div class="plate">כיכר צינה דיזנגוף<small>שחזור תלת־ממד 1940</small></div>
+    <div class="load-track"><i id="load-bar"></i></div>
+    <p><span id="load-text">טוענים את הכיכר</span> <span id="load-pct" dir="ltr">0%</span></p>
+    <button class="pill" id="load-again" hidden>לנסות שוב</button>
+  </div>
   <canvas id="gl" aria-label="סקיצה תלת־ממדית של כיכר דיזנגוף ב־1940"></canvas>
   <canvas id="grain" aria-hidden="true"></canvas>
   <div class="vig" aria-hidden="true"></div>
@@ -49,17 +56,13 @@
   <section class="bar" aria-label="שליטה">
     <button class="grip" id="grip" aria-label="הצגה או הסתרה של הסרגל" aria-expanded="true"></button>
     <div class="row">
-      <div class="seg" role="group" aria-label="נקודת מבט">
-        <button id="v-in" aria-pressed="true">בתוך הכיכר</button>
-        <button id="v-walk" aria-pressed="false">מהמדרכה</button>
-        <button id="v-roof" aria-pressed="false">מגג</button>
-        <button id="v-top" aria-pressed="false">מבט על</button>
-      </div>
+      <label class="cam-pick" title="בחירת מצלמה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.6-2.5h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.2" r="3.4"/></svg><select id="cam-select" aria-label="בחירת מצלמה"></select></label>
       <button class="btn" id="gyro">סיבוב עם הטלפון</button>
       <button class="btn" id="north" hidden>יישור לצפון</button>
     </div>
     <p class="hint" id="hint">גרור כדי להסתובב. צביטה לזום.</p>
     <div class="row spots" id="spots"><span class="hint">נקודות מידע:</span>
+      <button class="pill" data-spot="opening">חנוכת הכיכר 1938</button>
       <button class="pill" data-spot="genia">ג'ניה אוורבוך</button>
       <button class="pill" data-spot="video">Here We Are</button>
     </div>
@@ -69,6 +72,6 @@
 
 <script src="../lib/three.min.js"></script>
 <script src="../lib/GLTFLoader.js"></script>
-<script src="scene.js?v=1795649828"></script>
+<script src="scene.js?v=1795692568"></script>
 </body>
 </html>

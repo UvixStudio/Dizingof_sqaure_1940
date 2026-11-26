@@ -357,6 +357,21 @@ def build_island():
                 p = polar(GRAVEL + 2.1, t + s * half * 0.55)
                 pole(bm, (p.x, p.y, 0.1), (p.x, p.y, 3.2), 0.035, 0)
             finish("bench_stakes", bm, [M["stake"]], cp)
+    MID = random.Random(27)                          # own sequence, so the people already seated stay where they were
+    for k in range(4):
+        t = at(0.5, k)
+        half = deg(4.45, GRAVEL + 0.9)
+        bm = bmesh.new()
+        arc_box(bm, GRAVEL - 0.05, GRAVEL + 1.75, 0.09, 0.115, t - half, t + half, 16)
+        finish("alcove", bm, [M["promenade"]], ci)
+        for s in (-1, 0, 1):
+            tb = t + s * deg(2.7, GRAVEL + 0.95)
+            instance("bench", bench, polar(GRAVEL + 0.95, tb, 0.115), math.pi - math.radians(tb), cp)
+            if MID.random() < 0.45:
+                a = math.radians(tb)
+                along = Vector((math.cos(a), -math.sin(a), 0))
+                instance("sitter", MID.choice(SITTERS), polar(GRAVEL + 0.95, tb, 0.115) + along * MID.choice((-0.55, 0.15, 0.6)),
+                         math.atan2(-math.cos(a), -math.sin(a)), cp)
 
     # ---- flower beds, saplings in tripods, young palms ----
     for k in range(4):
@@ -378,7 +393,8 @@ def build_island():
                 busy = False
                 for k in range(4):
                     for frac, lo, hi, half in ((0.27, 0, 26.15, 3.2), (0.73, 0, 26.15, 3.2),
-                                               (0.36, 27.25, 28.65, 2.0), (0.64, 27.25, 28.65, 2.0)):
+                                               (0.36, 27.25, 28.65, 2.0), (0.64, 27.25, 28.65, 2.0),
+                                               (0.5, 0, 26.15, 4.55)):
                         d = (t - at(frac, k) + 180) % 360 - 180
                         busy = busy or (lo < r < hi and abs(math.radians(d) * r) < half)
                 if busy:
@@ -411,7 +427,7 @@ def build_island():
             me.materials.append(M[m])
         cp.objects.link(bpy.data.objects.new(name, me))
 
-    tufts("grass_tufts", 7000, 41)
+    tufts("grass_tufts", 4500, 41)                    # shipped to the web: kept light
     tufts("RO_grass_dense", 30000, 42)               # Blender renders only
 
     if FICUS == "young":
@@ -466,7 +482,7 @@ def build_island():
             instance("topiary", topiary, polar(BEDS - 0.5, t, 0.1), 0, cp, R.uniform(0.92, 1.06))
         for t in (t0, t1):                                           # lamps on the end posts
             instance("lamp", lamp, polar(BEDS + 0.26, t, 1.1), 0, cp)
-        instance("lamp", lamp, polar(GRAVEL + 0.7, at(0.5, k), 0.11), 0, cp)
+        instance("lamp", lamp, polar(GRAVEL + 0.9, at(0.5, k) + deg(4.65, GRAVEL + 0.9), 0.11), 0, cp)   # beside the middle benches, clear of the palm
 
     # ---- ficus on the outer pavement ----
     if FICUS == "young":

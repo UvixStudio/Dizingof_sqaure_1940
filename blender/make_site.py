@@ -1,6 +1,6 @@
 """Generate blender/preview/site/ from facelift/: same UI, geometry replaced by the Blender GLB.
 Run from anywhere:  python blender/make_site.py   (safe to re-run, facelift/ is only read)."""
-import json, os, re, shutil, time
+import json, os, re, runpy, shutil, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "facelift")
@@ -10,7 +10,13 @@ os.makedirs(OUT, exist_ok=True)
 os.makedirs(os.path.join(PREVIEW, "assets"), exist_ok=True)
 for a in ("genia.jpg", "plan.jpg"):
     shutil.copy(os.path.join(ROOT, "assets", a), os.path.join(PREVIEW, "assets", a))
-shutil.copy(os.path.join(SRC, "style.css"), os.path.join(OUT, "style.css"))
+WEB = os.path.join(ROOT, "blender", "web")          # code that only this site has: cameras, smooth dragging, speed
+
+
+def web(n):
+    return open(os.path.join(WEB, n), encoding="utf-8").read()
+
+
 
 
 def read(n):
@@ -20,6 +26,37 @@ def read(n):
 def rep(s, old, new):
     assert old in s, "missing anchor: " + old
     return s.replace(old, new, 1)
+
+
+def between(s, start, end, new):
+    """Replace everything from the start anchor up to (not including) the end anchor."""
+    a = s.index(start)
+    b = s.index(end, a)
+    return s[:a] + new + s[b:]
+
+
+def css_grade(sepia=.16, sat=.92, contrast=1.03):
+    """The CSS filter the canvas used to have, as one line of shader code."""
+    a, v = 1 - sepia, sat
+    S = [[.393 + .607 * a, .769 - .769 * a, .189 - .189 * a],
+         [.349 - .349 * a, .686 + .314 * a, .168 - .168 * a],
+         [.272 - .272 * a, .534 - .534 * a, .131 + .869 * a]]
+    T = [[.213 + .787 * v, .715 - .715 * v, .072 - .072 * v],
+         [.213 - .213 * v, .715 + .285 * v, .072 - .072 * v],
+         [.213 - .213 * v, .715 - .715 * v, .072 + .928 * v]]
+    m = [[contrast * sum(T[r][k] * S[k][c] for k in range(3)) for c in range(3)] for r in range(3)]
+    cols = ",".join("%.5f" % m[r][c] for c in range(3) for r in range(3))          # GLSL matrices are column by column
+    return "gl_FragColor.rgb = clamp(mat3(%s) * gl_FragColor.rgb + (%.5f), 0.0, 1.0);" % (cols, .5 - .5 * contrast)
+
+
+GRADE = css_grade()
+# the model as the site downloads it: smaller textures, tidier numbers, gzipped
+SIZE = runpy.run_path(os.path.join(ROOT, "blender", "pack_web.py"))["pack"](
+    os.path.join(PREVIEW, "kikar.glb"), os.path.join(PREVIEW, "kikar_web.glb.gz"))
+STAMP = json.load(open(os.path.join(PREVIEW, "stamp.json")))["time"]
+shutil.copy(os.path.join(SRC, "style.css"), os.path.join(OUT, "style.css"))
+with open(os.path.join(OUT, "style.css"), "a", encoding="utf-8") as f:
+    f.write(web("ui.css"))
 
 
 html = read("index.html")
@@ -35,12 +72,44 @@ html = html[:a] + """      <li>גרסת עבודה: המודל נבנה בבלנ
       <li>טבעות הגן, הכביש והמזרקה נמדדו מתצלומים, בדיוק משוער.</li>
       <li>חלק משמות העסקים לקוחים מתצלומים ומוויקיפדיה, השאר כלליים. מיקום החנויות, צבעי הסככות והכרזה הגדולה הם שחזור.</li>
 """ + html[b:]
+ICON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">'
+        '<path d="M4 8h3l1.6-2.5h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.2" r="3.4"/></svg>')
+html, n = re.subn(r'<div class="seg" role="group".*?</div>',
+                  lambda m: '<label class="cam-pick" title="בחירת מצלמה">%s<select id="cam-select" aria-label="בחירת מצלמה"></select></label>' % ICON,
+                  html, flags=re.S)
+assert n == 1, "camera buttons not found"
+html = rep(html, 'href="style.css"', 'href="style.css?v=%d"' % int(time.time()))
+html = rep(html, '<button class="pill" data-spot="genia">', '<button class="pill" data-spot="opening">חנוכת הכיכר 1938</button>\n      <button class="pill" data-spot="genia">')
+html = rep(html, '<div dir="rtl">', '''<div dir="rtl">
+  <div class="loading" id="loading" role="status">
+    <div class="plate">כיכר צינה דיזנגוף<small>שחזור תלת־ממד 1940</small></div>
+    <div class="load-track"><i id="load-bar"></i></div>
+    <p><span id="load-text">טוענים את הכיכר</span> <span id="load-pct" dir="ltr">0%</span></p>
+    <button class="pill" id="load-again" hidden>לנסות שוב</button>
+  </div>''')
+html = rep(html, "</head>", '<link rel="preload" as="fetch" crossorigin href="../kikar_web.glb.gz?t=%d">\n</head>' % STAMP)
 # a new address on every build, so a browser never keeps running yesterday's scene.js
 BUILD = int(time.time())
 html = rep(html, 'src="scene.js"', 'src="scene.js?v=%d"' % BUILD)
 open(os.path.join(OUT, "index.html"), "w", encoding="utf-8").write(html)
 
 js = read("scene.js")
+# cameras and input (replaces the four view buttons, the pointer code and the phone sensor code)
+js = between(js, "// ---------- viewpoints and camera ----------", '$("info-btn")', web("controls.js"))
+js = rep(js, 'cam.mode = "fp"; rig.rotation.set(0, 0, 0); look.yaw = from.yaw;', 'stopMotion(); cam.mode = "fp"; rig.rotation.set(0, 0, 0); look.yaw = from.yaw;')
+js = rep(js, 'if (cam.mode === "orbit") applyOrbit(); else if (gyro.on && gyro.e) applyGyro(); else camera.rotation.set(look.pitch, look.yaw, 0);',
+         'updateCamera(dt);')
+# frame pacing: cars move inside the same frame that draws them, and slow devices draw fewer pixels
+js = rep(js, "const dt = Math.min(.05, (now - last) / 1000); last = now;",
+         "const ms = now - last, dt = clamp(ms / 1000, 0, .1); last = now; adapt(ms, now); moveTraffic(now, dt);")
+js = rep(js, "// ---------- renderer ----------", web("perf.js") + "// ---------- renderer ----------")
+js = rep(js, "new THREE.WebGLRenderer({ canvas, antialias: true });", "new THREE.WebGLRenderer({ canvas, antialias: !weak });")
+js = rep(js, "renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));",
+         'renderer.setPixelRatio(ratio);\n  THREE.ShaderChunk.fog_fragment += "\\n' + GRADE + '";   // colour grade, once per pixel inside the shaders')
+# video cards: each names its own film, and an old 4:3 film gets a 4:3 frame
+js = rep(js, 'aria-label="נגן את הפתיח" style="background-image:url(https://img.youtube.com/vi/${c.video}/hqdefault.jpg)',
+         'aria-label="נגן את הסרטון" style="aspect-ratio:${c.ratio || \'16 / 9\'};background-image:url(https://img.youtube.com/vi/${c.video}/hqdefault.jpg)')
+js = rep(js, 'title="Here We Are, הפתיח"', 'title="${esc(c.title)}" style="aspect-ratio:${c.ratio || \'16 / 9\'}"')
 # street signs: real bearings from OSM (clockwise from north)
 js = rep(js, "  const signs = [];\n", """  [["דיזנגוף", "DIZENGOFF", 348], ["ריינס", "REINES", 43], ["זמנהוף", "ZAMENHOF", 98],
    ["דיזנגוף", "DIZENGOFF", 168], ["פינסקר", "PINSKER", 225], ["בן עמי", "BEN AMI", 299]]
@@ -50,7 +119,7 @@ js = rep(js, "  const signs = [];\n", """  [["דיזנגוף", "DIZENGOFF", 348]
 js = rep(js, "    signs.push(s);\n", "    dotM.userData.keep = true;\n    signs.push(s);\n")
 js = rep(js, "g.add(gl);\n", "g.add(gl); scene.attach(gl); gl.userData.keep = true;\n")
 i = js.rindex("requestAnimationFrame(frame);")
-js = js[:i] + """// ---------- replace the procedural geometry with the Blender model ----------
+js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry with the Blender model ----------
   const POOL_R = 8.4, WATER_Z = 0.17;                   // calibrated, see data/research_notes.md
   water.geometry.dispose(); water.geometry = new THREE.CircleGeometry(POOL_R - .05, 80).rotateX(-Math.PI / 2); water.position.y = WATER_Z;
   waterMat.vertexShader = "varying vec3 vP; varying vec3 vW; void main(){ vP = position; vec4 w = modelMatrix*vec4(position,1.0); vW = w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }";
@@ -69,6 +138,7 @@ js = js[:i] + """// ---------- replace the procedural geometry with the Blender 
       col = mix(col, vec3(.90,.93,.94), clamp(foam*(.75 + .25*c), 0.0, 1.0));
       col *= mix(.78, 1.0, smoothstep(8.4, 7.2, r));
       gl_FragColor = vec4(col, 1.0);
+      __GRADE__
     }`;
   waterMat.needsUpdate = true;
   // fountain as in MAT-22292: tall central column, an umbrella of streams, thin jets from the rim inward
@@ -100,8 +170,11 @@ js = js[:i] + """// ---------- replace the procedural geometry with the Blender 
   sun.position.set(-80, 53, 29);                      // bearing 250, 32 degrees, as in Blender
   Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70 }); sun.shadow.camera.updateProjectionMatrix();
   sun.intensity = .88; sun.shadow.bias = -.0004; sun.shadow.normalBias = .35; sun.shadow.radius = 3;
-  function loadModel(t) {
-    new THREE.GLTFLoader().load("../kikar.glb?t=" + t, (g) => {
+  async function loadModel(t) {
+    let buf;
+    try { buf = await modelBytes(t); } catch (e) { loadFailed(e); return; }
+    progress(.93, "מרכיבים את הכיכר"); await painted();
+    new THREE.GLTFLoader().parse(buf, "../", (g) => {
       const old = scene.getObjectByName("blender");
       if (old) { scene.remove(old); old.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } }); }
       g.scene.name = "blender";
@@ -123,7 +196,9 @@ js = js[:i] + """// ---------- replace the procedural geometry with the Blender 
       scene.add(g.scene);
       collect(g.scene);
       merge(g.scene);
-    });
+      shadows(g.scene);
+      reveal();
+    }, loadFailed);
   }
   // ---------- building labels (cream plates, so they are not mistaken for street names) + Esther card ----------
   const LABELS = { B: ["קולנוע כיכר דיזנגוף", "לימים קולנוע אסתר"], D: ["בתי פלדמן וגרינמן", "1935-36 · המיקום לאימות"],
@@ -236,18 +311,16 @@ js = js[:i] + """// ---------- replace the procedural geometry with the Blender 
     });
   }
   camera.near = .4; camera.updateProjectionMatrix();
-  window.__render = () => renderer.info.render;      // for checking the load from the console
-  let before = null;
-  function drive(now) {
-    const dt = before === null ? 0 : Math.min((now - before) / 1000, .05); before = now;
-    if (!reduce) movers.forEach((m) => {
+  window.__kikar.renderer = renderer; window.__kikar.camera = camera;      // for checking the load from the console
+  function moveTraffic(now, dt) {
+    if (reduce && cam.mode !== "ride") return;            // a ride was asked for, so it drives even with reduced motion
+    movers.forEach((m) => {
       m.o.position.applyAxisAngle(UP, m.w * dt);
       m.o.quaternion.premultiply(turn.setFromAxisAngle(UP, m.w * dt));
       if (m.bob) m.o.position.y = m.y + Math.abs(Math.sin(now / 160 + m.ph)) * .035;
     });
-    requestAnimationFrame(drive);
+    placeShadows();
   }
-  requestAnimationFrame(drive);
   const BUILD = __BUILD__;
   setInterval(async () => {
     try {
@@ -255,7 +328,8 @@ js = js[:i] + """// ---------- replace the procedural geometry with the Blender 
       if (v.build > BUILD) location.replace("index.html?v=" + v.build);
     } catch (e) { /* hosted copy or offline: keep what is loaded */ }
   }, 5000);
-  let stamp = null;
+  let stamp = __STAMP__;
+  loadModel(stamp);                                   // at once, the check below is only for rebuilds
   (async function poll() {
     try {
       const s = await (await fetch("../stamp.json?t=" + Date.now(), { cache: "no-store" })).json();
@@ -263,7 +337,7 @@ js = js[:i] + """// ---------- replace the procedural geometry with the Blender 
     } catch (e) { /* nothing published yet */ }
     setTimeout(poll, 4000);
   })();
-  """ + js[i:]
+  """.replace("__GRADE__", GRADE) + web("shadows.js") + web("opening.js") + js[i:]
 # sky: panorama made from the same HDRI as in Blender (sky.py writes sky.jpg and sky.json)
 haze = json.load(open(os.path.join(OUT, "sky.json")))["haze"]
 js = rep(js, "const HAZE = 0xe6e2d3;", "const HAZE = %s;" % haze)
@@ -284,6 +358,8 @@ js = js[:a] + """  // ---------- sky: HDRI panorama, texture column = compass be
   }
 
 """ + js[b:]
+for key, value in (("__PACKED__", SIZE["packed"]), ("__PLAIN__", SIZE["plain"]), ("__STAMP__", STAMP)):
+    js = js.replace(key, str(value))
 open(os.path.join(OUT, "scene.js"), "w", encoding="utf-8").write(rep(js, "__BUILD__", str(BUILD)))
 with open(os.path.join(OUT, "build.json"), "w") as f:        # written last: scene.js is already complete
     json.dump({"build": BUILD}, f)

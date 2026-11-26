@@ -54,6 +54,7 @@ class Chain:
                     ns.append(Vector((-d.y, d.x)) if self.left_normal else Vector((d.y, -d.x)))
             m = sum(ns, Vector((0, 0))).normalized()
             self.normals.append(m / max(0.5, m.dot(ns[0])))
+        self._bends = None
 
     def at(self, s, inset=0.0):
         """Point and inward normal at distance s."""
@@ -67,6 +68,34 @@ class Chain:
         inner = [s for s in self.s if s0 + 0.05 < s < s1 - 0.05]
         return [s0] + inner + [s1]
 
+    def cuts(self, s0, s1):
+        """Like samples(), without the cuts that do not change the shape (straight runs)."""
+        if self._bends is None:
+            self._bends = self._find_bends()
+        return [s0] + [s for s in self._bends if s0 + 0.05 < s < s1 - 0.05] + [s1]
+
+    def _find_bends(self, tol=0.001, insets=(-1.2, 0.0, 1.5, 3.0, 5.0, 7.0)):
+        """The distances needed so that every offset of the chain stays within `tol` metres of itself."""
+        lines = [[self.at(s, d)[0] for s in self.s] for d in insets]
+
+        def straight(i, j):
+            for p in lines:
+                a, ab = p[i], p[j] - p[i]
+                for k in range(i + 1, j):
+                    t = max(0.0, min(1.0, (p[k] - a).dot(ab) / max(1e-9, ab.length_squared)))
+                    if (a + ab * t - p[k]).length > tol:
+                        return False
+            return True
+
+        keep, i, n = [self.s[0]], 0, len(self.s)
+        while i < n - 1:
+            j = i + 1
+            while j + 1 < n and straight(i, j + 1):
+                j += 1
+            keep.append(self.s[j])
+            i = j
+        return keep
+
     def s_near(self, xy):
         k = min(range(len(self.pts)), key=lambda i: (self.pts[i] - Vector(xy)).length)
         return self.s[k]
@@ -75,7 +104,7 @@ class Chain:
 def sweep(bm, ch, s0, s1, profile, mat=0):
     """Extrude a closed (inset, z) profile along the chain between s0 and s1, with end caps."""
     rings = []
-    for s in ch.samples(s0, s1):
+    for s in ch.cuts(s0, s1):
         ring = []
         for inset, z in profile:
             p, _ = ch.at(s, inset)
