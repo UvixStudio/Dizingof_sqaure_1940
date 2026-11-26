@@ -47,15 +47,29 @@ def tint(base, lum):
     return np.stack([lum * c for c in base], -1)
 
 
-# grass: patchy greens, dry spots, fine blade speckle (tile = 4 m)
-patch = noise(1 / 300, 1 / 40, 0.6)
-fine = noise(1 / 12, 1 / 2, 0.2)
-dry = np.clip((noise(1 / 400, 1 / 60, 0.8) - 0.62) * 3, 0, 1)
-g = np.stack([0.30 + 0.10 * patch, 0.47 + 0.12 * patch, 0.17 + 0.05 * patch], -1)
-g = g * (0.80 + 0.35 * fine[..., None])
-g = g * (1 - dry[..., None]) + np.array([0.46, 0.44, 0.24]) * dry[..., None] * (0.85 + 0.3 * fine[..., None])
-g += speckle(0.006, 1)[..., None] * 0.07
-save("grass", g)
+# grass: one 2048 px map over the whole island (tile = 64 m, 3 cm per pixel) so nothing repeats
+def big_noise(n, lo_m, hi_m, power=0.6):
+    """Periodic noise with features between lo_m and hi_m metres on a 64 m map of n px."""
+    f = np.sqrt(np.fft.fftfreq(n)[:, None] ** 2 + np.fft.fftfreq(n)[None, :] ** 2) * n / 64.0   # cycles per metre
+    mask = ((f >= 1 / hi_m) & (f <= 1 / lo_m)) / np.maximum(f, 1e-6) ** power
+    v = np.real(np.fft.ifft2(np.fft.fft2(rng.standard_normal((n, n))) * mask))
+    return np.clip((v - v.mean()) / (v.std() * 4) + 0.5, 0, 1)
+
+
+G = 2048
+broad = big_noise(G, 3.0, 14.0)[..., None]
+mid = big_noise(G, 0.7, 3.0)[..., None]
+clump = big_noise(G, 0.12, 0.6, 0.3)[..., None]
+grain = big_noise(G, 0.06, 0.14, 0.0)[..., None]
+dark, light, straw, soil = (np.array(c) for c in ((0.22, 0.33, 0.12), (0.44, 0.53, 0.20), (0.60, 0.54, 0.30), (0.47, 0.37, 0.25)))
+g = dark + (light - dark) * np.clip((broad * 0.55 + mid * 0.45 - 0.5) * 1.9 + 0.5, 0, 1)
+dry = np.clip((big_noise(G, 1.0, 7.0)[..., None] - 0.60) * 3.2 + (clump - 0.5) * 0.7, 0, 1)
+g = g * (1 - dry) + straw * dry
+bare = np.clip((big_noise(G, 0.5, 2.5)[..., None] - 0.76) * 5 + (grain - 0.5) * 1.2, 0, 1)
+g = g * (1 - bare) + soil * bare
+g = g * (0.74 + 0.34 * clump + 0.18 * grain)
+Image.fromarray((np.clip(g, 0, 1) * 255).astype(np.uint8)).save(os.path.join(OUT, "grass.jpg"), quality=72)
+print("grass")
 
 # gravel / crushed kurkar path (tile = 3 m)
 base = noise(1 / 250, 1 / 30, 0.7)
@@ -89,12 +103,12 @@ save("plaster", tint((0.91, 0.91, 0.89), lum))
 # warm cream stucco of the ring blocks (colour from the colourised photos)
 lum = 0.92 + 0.03 * noise(1 / 300, 1 / 20, 0.6) - 0.035 * np.clip(noise(1 / 400, 1 / 60, 0.9) - 0.6, 0, 1) * 3
 lum += 0.008 * speckle(0.02, 1)
-for nm, col in (("wall_esther", (0.93, 0.915, 0.87)), ("wall_white", (0.92, 0.915, 0.895)),
-                ("wall_warm", (0.925, 0.90, 0.835)), ("wall_cream", (0.92, 0.875, 0.775))):
+for nm, col in (("wall_esther", (0.955, 0.945, 0.915)), ("wall_white", (0.955, 0.945, 0.915)),
+                ("wall_warm", (0.955, 0.945, 0.915)), ("wall_cream", (0.955, 0.945, 0.915))):
     save(nm, tint(col, lum))
 
 # promenade: smooth light grey (reads almost white-grey in the 1938 photos)
-lum = 0.90 + 0.05 * noise(1 / 300, 1 / 30, 0.7) + 0.03 * speckle(0.04, 1)
+lum = 0.90 + 0.09 * (noise(1 / 700, 1 / 120, 1.0) - 0.5) + 0.05 * noise(1 / 120, 1 / 12, 0.5) + 0.035 * speckle(0.05, 1)
 save("promenade", tint((0.78, 0.765, 0.73), lum))
 
 # pool coping stone: mottled light stone
@@ -136,6 +150,38 @@ def cage(d):      # tree guard: uprights and three hoops
     for y in (4, 180, 360):
         d.rectangle((0, y, 511, y + 8), fill=ink)
 
+
+def leaf_card(name, base):
+    """Cluster of small ficus leaves on a transparent card; hidden pixels keep the leaf colour (no dark fringe)."""
+    from PIL import ImageDraw
+    r = np.random.default_rng(sum(map(ord, name)))
+    im = Image.new("RGBA", (256, 256), base + (0,))
+    d = ImageDraw.Draw(im)
+    for _ in range(190):
+        rad, ang = 112 * r.random() ** 0.55, r.uniform(0, 6.283)
+        c = np.array([128 + rad * np.cos(ang), 128 + rad * np.sin(ang)])
+        a, ln, wd = r.uniform(0, 6.283), r.uniform(11, 17), r.uniform(5, 8)
+        u, v = np.array([np.cos(a), np.sin(a)]), np.array([-np.sin(a), np.cos(a)])
+        pts = [c + u * ln * x + v * wd * y for x, y in ((-1, 0), (-.4, .8), (.4, .75), (1, 0), (.4, -.75), (-.4, -.8))]
+        k = r.uniform(0.72, 1.28)
+        col = tuple(int(min(255, ch * k)) for ch in base)
+        d.polygon([tuple(p) for p in pts], fill=col + (255,))
+        rib = tuple(min(255, int(ch * 1.2)) for ch in col) + (255,)
+        d.line([tuple(c - u * ln * .8), tuple(c + u * ln * .8)], fill=rib)
+    im.save(os.path.join(OUT, name + ".png"))
+    print(name)
+
+
+leaf_card("leaf_a", (46, 82, 34))       # dark glossy
+leaf_card("leaf_b", (78, 112, 42))      # mid green
+leaf_card("leaf_c", (118, 132, 56))     # young, yellowish
+
+exec(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "people_palette.py"), encoding="utf-8").read())
+pal = np.zeros((256, 256, 3))
+for i, (_name, rgb) in enumerate(COLORS):
+    pal[(i // 8) * 32:(i // 8 + 1) * 32, (i % 8) * 32:(i % 8 + 1) * 32] = np.array(rgb) / 255
+Image.fromarray((pal * 255).astype(np.uint8)).save(os.path.join(OUT, "people.png"))
+print("people")
 
 cutout("lattice", lattice)
 cutout("cage", cage)

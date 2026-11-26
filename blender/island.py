@@ -2,7 +2,7 @@
 fc338997, film frames 02:43 / 02:52 / 03:08). Run by build_square.py with its globals
 (helpers, radii, collections), via runpy init_globals."""
 import bmesh, math, random
-from mathutils import Vector, Matrix
+from mathutils import Vector, Matrix, noise
 
 R = random.Random(1938)
 SEGMENTS = [(PATHS[k], PATHS[k] + (PATHS[(k + 1) % 4] - PATHS[k]) % 360) for k in range(4)]   # lawn between paths
@@ -172,15 +172,71 @@ def tripod_mesh():
     return mesh_from("tripod", bm, [M["stake"]])
 
 
-def street_tree_mesh(seed):
+def ficus_mesh(seed, age):
+    """Ficus: smooth grey trunk, a few leaders, irregular dome of leaf clusters. Each cluster = opaque
+    core (casts the shade, also on the web) wrapped in leaf cards with their own 0..1 UVs."""
     r = random.Random(seed)
+    big = age == "mature"
+    fork, crown_z, spread, tall, trunk = (2.3, 4.4, 2.1, 0.9, 0.2) if big else (1.9, 2.75, 0.5, 0.35, 0.055)
+    mats = [M["leafcard_a"], M["leafcard_b"], M["leafcard_c"], M["leaf_core"], M["ficus_bark"]]
+    main = seed % 3
     bm = bmesh.new()
-    pole(bm, (0, 0, 0), (0, 0, 2.1), 0.055, 1, 6)
-    blob(bm, (0, 0, 2.65), 0.62, r.uniform(1.15, 1.45), 0, 0.14, 2)
-    for k in range(5):
-        a = r.uniform(0, 6.28)
-        blob(bm, (0.42 * math.cos(a), 0.42 * math.sin(a), r.uniform(2.2, 3.1)), 0.28, 1.0, 0, 0.3)
-    return mesh_from("street_tree_%d" % seed, bm, [M["leaves"], M["bark"]])
+    pole(bm, (0, 0, 0), (r.uniform(-.08, .08), r.uniform(-.08, .08), fork), trunk, 4, 8)
+    clusters = [(Vector((r.uniform(-.3, .3), r.uniform(-.3, .3), crown_z + tall * 0.7)), 1.7 if big else 0.55)]
+    n = r.randint(5, 7) if big else 3
+    for k in range(n):
+        a = 6.283 * k / n + r.uniform(-.4, .4)
+        d = spread * r.uniform(0.7, 1.15)
+        c = Vector((d * math.cos(a), d * math.sin(a), crown_z + r.uniform(-.6, .7) * tall))
+        clusters.append((c, r.uniform(1.1, 1.6) if big else r.uniform(0.32, 0.5)))
+    for c, rad in clusters:                                       # limbs
+        mid = Vector((c.x * 0.45, c.y * 0.45, fork + (c.z - fork) * 0.55))
+        pole(bm, (0, 0, fork - 0.15), mid, trunk * 0.55, 4, 5)
+        pole(bm, mid, c, trunk * 0.28, 4, 4)
+    cards = []
+    for c, rad in clusters:
+        g = bmesh.ops.create_icosphere(bm, subdivisions=2, radius=rad * 0.74)
+        for v in g["verts"]:
+            v.co *= 1 + r.uniform(-.18, .18)
+            v.co.z *= 0.72
+            v.co += c
+        for f in {f for v in g["verts"] for f in v.link_faces}:
+            f.material_index = 3
+        tone = main if r.random() < 0.65 else r.randrange(3)
+        for _ in range(46 if big else 26):
+            u = Vector((0, 0, -1))
+            while u.z < -0.55:
+                u = Vector((r.gauss(0, 1), r.gauss(0, 1), r.gauss(0, 1))).normalized()
+            p = c + Vector((u.x, u.y, u.z * 0.75)) * rad * r.uniform(0.78, 1.12)
+            axis = (u + Vector((r.gauss(0, .7), r.gauss(0, .7), r.gauss(0, .7)))).normalized()
+            s = axis.orthogonal().normalized()
+            s.rotate(Matrix.Rotation(r.uniform(0, 6.283), 3, axis))
+            t = axis.cross(s)
+            half = r.uniform(0.34, 0.5) if big else r.uniform(0.17, 0.26)
+            f = bm.faces.new([bm.verts.new(p + (s * x + t * y) * half) for x, y in ((-1, -1), (1, -1), (1, 1), (-1, 1))])
+            f.material_index = tone if r.random() < 0.85 else (tone + 1) % 3
+            bm.faces.index_update()
+            cards.append((len(bm.faces) - 1, c))
+    bm.normal_update()
+    me = bpy.data.meshes.new("ficus_%s_%d" % (age, seed))
+    bm.to_mesh(me)
+    bm.free()
+    for m in mats:
+        me.materials.append(m)
+    box_uv(me)
+    uv = me.uv_layers[0].data
+    normals = [v.normal.copy() for v in me.vertices]
+    for index, c in cards:
+        p = me.polygons[index]
+        assert p.material_index < 3
+        for li, co in zip(p.loop_indices, ((0, 0), (1, 0), (1, 1), (0, 1))):
+            uv[li].uv = co
+        for vi in p.vertices:                                     # light the card like part of a round crown
+            normals[vi] = ((me.vertices[vi].co - c).normalized() + Vector((0, 0, 0.55))).normalized()
+    for p in me.polygons:
+        p.use_smooth = True
+    me.normals_split_custom_set_from_vertices(normals)
+    return me
 
 
 def topiary_mesh():
@@ -264,13 +320,22 @@ def build_island():
 
     # ---- promenade, cross paths, outer lawns ----
     annulus("promenade", INNER_LAWN + 0.2, ISLAND_R, 0.08, M["promenade"], ci)
-    annulus("lawn_beds", GRAVEL, BEDS, 0.10, M["grass"], ci)
-    for b in PATHS:
-        strip("cross_path_%d" % b, b, GRAVEL - 0.3, ISLAND_R - 0.2, PATH_W, 0.113, M["promenade"], ci)
+    for k, (t0, t1) in enumerate(SEGMENTS):          # lawn between the paths; the paths are the promenade itself
+        bm = bmesh.new()
+        rows = []
+        for j in range(5):
+            r = GRAVEL + (BEDS - GRAVEL) * j / 4
+            cut = math.degrees(math.asin(PATH_W / 2 / r))
+            rows.append([bm.verts.new(polar(r, t0 + cut + (t1 - t0 - 2 * cut) * i / 48, 0.10)) for i in range(49)])
+        for j in range(4):
+            for i in range(48):
+                bm.faces.new((rows[j][i], rows[j + 1][i], rows[j + 1][i + 1], rows[j][i + 1]))
+        finish("lawn_beds_%d" % k, bm, [M["grass"]], ci)
     ring_wall("island_curb", ISLAND_R - 0.3, ISLAND_R, 0.0, 0.2, M["concrete"], ci)
 
     # ---- bench alcoves notched into the lawn, two benches each, with stakes ----
     bench = bench_mesh()
+    SIT = random.Random(26)
     for k in range(4):
         for frac in (0.27, 0.73):
             t = at(frac, k)
@@ -281,6 +346,12 @@ def build_island():
             for s in (-1, 1):
                 tb = t + s * deg(1.35, GRAVEL + 0.95)
                 instance("bench", bench, polar(GRAVEL + 0.95, tb, 0.115), math.pi - math.radians(tb), cp)
+                if SIT.random() < 0.6:                       # people resting on about half of the benches
+                    a = math.radians(tb)
+                    along = Vector((math.cos(a), -math.sin(a), 0))
+                    for off in SIT.choice(((-0.6,), (0.55,), (-0.55, 0.15))):
+                        instance("sitter", SIT.choice(SITTERS), polar(GRAVEL + 0.95, tb, 0.115) + along * off,
+                                 math.atan2(-math.cos(a), -math.sin(a)), cp)
             bm = bmesh.new()
             for s in (-1, 1):
                 p = polar(GRAVEL + 2.1, t + s * half * 0.55)
@@ -295,16 +366,71 @@ def build_island():
             bm = bmesh.new()
             arc_box(bm, 27.35, 28.55, 0.1, 0.2, t - half, t + half, 8)
             finish("flower_bed", bm, [M["flowers"]], ci)
-    saplings = [sapling_mesh(s) for s in (11, 12, 13)]
-    tripod = tripod_mesh()
-    i = 0
-    for k in range(4):
-        for frac, rr in ((0.12, 26.0), (0.44, 25.9), (0.56, 26.2), (0.88, 26.1)):
-            p = polar(rr, at(frac, k), 0.1)
-            instance("sapling", saplings[i % 3], p, R.uniform(0, 6.28), cp, R.uniform(0.9, 1.1))
-            if frac in (0.44, 0.56):
-                instance("tripod", tripod, p, R.uniform(0, 6.28), cp)
-            i += 1
+    # ---- grass blades: uneven tufts so the lawn does not read as a painted floor ----
+    def lawn_point(R):
+        while True:
+            inner = R.random() < 0.4
+            r0, r1 = (POOL_R + RIM_W + 0.05, INNER_LAWN - 0.05) if inner else (GRAVEL + 0.1, BEDS - 0.95)
+            r, t = math.sqrt(R.uniform(r0 * r0, r1 * r1)), R.uniform(0, 360)
+            if not inner:
+                if near_path(t, r, 0.05):
+                    continue
+                busy = False
+                for k in range(4):
+                    for frac, lo, hi, half in ((0.27, 0, 26.15, 3.2), (0.73, 0, 26.15, 3.2),
+                                               (0.36, 27.25, 28.65, 2.0), (0.64, 27.25, 28.65, 2.0)):
+                        d = (t - at(frac, k) + 180) % 360 - 180
+                        busy = busy or (lo < r < hi and abs(math.radians(d) * r) < half)
+                if busy:
+                    continue
+            return r, t
+
+    def tufts(name, count, seed):
+        R = random.Random(seed)
+        bm = bmesh.new()
+        for _ in range(count):
+            r, t = lawn_point(R)
+            p = polar(r, t, 0.098)
+            patch = noise.noise(p * 0.35) + 0.5 * noise.noise(p * 1.3)
+            mat = 2 if patch > 0.32 else (1 if patch < -0.2 else 0)
+            tall = max(0.03, 0.065 + 0.05 * noise.noise(p * 0.8) + R.uniform(-0.015, 0.025))
+            for _b in range(3):
+                a = R.uniform(0, 2 * math.pi)
+                lean = Vector((math.cos(a), math.sin(a), 0))
+                side = Vector((-lean.y, lean.x, 0)) * R.uniform(0.008, 0.016)
+                q = p + Vector((R.uniform(-.06, .06), R.uniform(-.06, .06), 0))
+                tip = q + lean * tall * R.uniform(0.4, 1.0) + Vector((0, 0, tall * R.uniform(0.7, 1.2)))
+                vs = [q - side, q + side, tip]
+                if (vs[1] - vs[0]).cross(vs[2] - vs[0]).z < 0:
+                    vs.reverse()
+                bm.faces.new([bm.verts.new(v) for v in vs]).material_index = mat
+        me = bpy.data.meshes.new(name)
+        bm.to_mesh(me)
+        bm.free()
+        for m in ("blade_green", "blade_dark", "blade_dry"):
+            me.materials.append(M[m])
+        cp.objects.link(bpy.data.objects.new(name, me))
+
+    tufts("grass_tufts", 7000, 41)
+    tufts("RO_grass_dense", 30000, 42)               # Blender renders only
+
+    if FICUS == "young":
+        saplings = [sapling_mesh(s) for s in (11, 12, 13)]
+        tripod = tripod_mesh()
+        i = 0
+        for k in range(4):
+            for frac, rr in ((0.12, 26.0), (0.44, 25.9), (0.56, 26.2), (0.88, 26.1)):
+                p = polar(rr, at(frac, k), 0.1)
+                instance("sapling", saplings[i % 3], p, R.uniform(0, 6.28), cp, R.uniform(0.9, 1.1))
+                if frac in (0.44, 0.56):
+                    instance("tripod", tripod, p, R.uniform(0, 6.28), cp)
+                i += 1
+    else:                                            # shade trees over the benches and the outer lawn
+        inner = [ficus_mesh(s, "mature") for s in (31, 32, 33)]
+        for k in range(4):
+            for j, frac in enumerate((0.31, 0.69)):
+                instance("ficus", inner[(k + j) % 3], polar(28.3, at(frac, k) + R.uniform(-1.5, 1.5), 0.08),
+                         R.uniform(0, 6.28), cp, R.uniform(0.72, 0.88))
     palms = [palm_mesh(s) for s in (1, 2, 3)]
     for k in range(4):
         for j, frac in enumerate((0.19, 0.50, 0.81)):
@@ -342,17 +468,21 @@ def build_island():
             instance("lamp", lamp, polar(BEDS + 0.26, t, 1.1), 0, cp)
         instance("lamp", lamp, polar(GRAVEL + 0.7, at(0.5, k), 0.11), 0, cp)
 
-    # ---- young street trees in wire cages on the outer pavement ----
-    trees = [street_tree_mesh(s) for s in (21, 22, 23)]
-    cage = cage_mesh(M["cage"])
+    # ---- ficus on the outer pavement ----
+    if FICUS == "young":
+        trees, count, pad = [ficus_mesh(s, "young") for s in (21, 22, 23, 24)], 34, 1.2
+        cage = cage_mesh(M["cage"])
+    else:
+        trees, count, pad = [ficus_mesh(s, "mature") for s in (41, 42, 43, 44, 45, 46)], 26, 1.9
     i = 0
-    for k in range(36):
-        t = 360 * k / 36 + 5
-        if near_path(t, ISLAND_R - 2.2, 1.2):
+    for k in range(count):
+        t = 360 * k / count + 5 + R.uniform(-2.0, 2.0)
+        if near_path(t, ISLAND_R - 2.3, pad):
             continue
-        p = polar(ISLAND_R - 2.2, t, 0.08)
-        instance("street_tree", trees[i % 3], p, R.uniform(0, 6.28), cp, R.uniform(0.9, 1.08))
-        instance("tree_cage", cage, p, 0, cp)
+        p = polar(ISLAND_R - 2.3 + R.uniform(-.25, .25), t, 0.08)
+        instance("ficus", trees[i % len(trees)], p, R.uniform(0, 6.28), cp, R.uniform(0.82, 1.14))
+        if FICUS == "young":
+            instance("tree_cage", cage, p, 0, cp)
         i += 1
 
 

@@ -58,6 +58,12 @@ def bus(bm):
     box(bm, 2.33, 2.44, -0.95, 0.95, 1.55, 2.3, GLASS)
     extrude(bm, [(2.4, 0.65), (2.4, 1.55), (3.55, 1.4), (3.7, 1.2), (3.7, 0.65)], -0.55, 0.55, BLACK)
     box(bm, 3.68, 3.76, -0.34, 0.34, 0.7, 1.3, LIGHT)
+    for sy in (-0.75, 0.75):                                                   # roof rack with luggage
+        box(bm, -3.0, 1.5, sy - 0.025, sy + 0.025, 3.05, 3.1, BLACK)
+        for x in (-3.0, -1.5, 0.0, 1.47):
+            box(bm, x, x + 0.03, sy - 0.02, sy + 0.02, 2.9, 3.06, BLACK)
+    for x0, x1, y0, y1, h in ((-2.8, -2.0, -0.55, 0.1, 0.34), (-1.85, -1.35, -0.2, 0.6, 0.26), (-0.2, 0.55, -0.5, 0.3, 0.22)):
+        box(bm, x0, x1, y0, y1, 2.92, 2.92 + h, WOOD)
     for sy in (-1, 1):
         for x in (2.95, -2.4):
             fender(bm, x, sy * 0.98 - 0.2, sy * 0.98 + 0.2, 0.66)
@@ -94,7 +100,57 @@ def cart(bm):
     box(bm, -0.55, -0.25, -0.2, 0.2, 0.98, 1.9, BLACK)                                         # driver
 
 
-KINDS = {"sedan": sedan, "bus": bus, "truck": truck, "cart": cart}
+def bus_city(bm):
+    """Light town bus with one long dark window band and a short bonnet (square film frame, 056ed852)."""
+    extrude(bm, [(-3.3, 0.6), (-3.5, 1.0), (-3.45, 2.05), (2.4, 2.05), (2.6, 1.45), (2.6, 0.6)], -1.08, 1.08, BODY)
+    extrude(bm, [(-3.42, 2.04), (-3.2, 2.38), (-2.8, 2.5), (1.85, 2.5), (2.25, 2.34), (2.42, 2.04)], -1.05, 1.05, LIGHT)
+    box(bm, -3.15, 2.3, -1.095, 1.095, 1.45, 2.08, GLASS)
+    for k in range(8):
+        x = -3.15 + k * 0.776
+        box(bm, x - 0.035, x + 0.035, -1.11, 1.11, 1.43, 2.11, BODY)
+    box(bm, -3.46, 2.6, -1.1, 1.1, 1.22, 1.30, BLACK)                          # waist line
+    extrude(bm, [(2.55, 0.6), (2.55, 1.4), (3.2, 1.28), (3.38, 1.05), (3.38, 0.6)], -0.52, 0.52, BODY)
+    box(bm, 3.36, 3.44, -0.32, 0.32, 0.66, 1.15, BLACK)                        # grille
+    box(bm, 3.45, 3.56, -0.9, 0.9, 0.52, 0.62, BLACK)                          # bumper
+    for sy in (-1, 1):
+        box(bm, 3.15, 3.36, sy * 0.68 - 0.1, sy * 0.68 + 0.1, 0.95, 1.15, LIGHT)
+        for x in (2.75, -2.25):
+            fender(bm, x, sy * 0.95 - 0.19, sy * 0.95 + 0.19, 0.62)
+            wheel(bm, x, sy * 1.0, 0.47, 0.24)
+
+
+def coupe(bm):
+    """Small two-door with a rounded tail."""
+    extrude(bm, [(-1.75, 0.45), (-1.7, 0.75), (-1.25, 1.0), (0.45, 1.0), (1.55, 0.92), (1.72, 0.75), (1.72, 0.45)], -0.62, 0.62, BODY)
+    extrude(bm, [(-0.9, 0.98), (-0.72, 1.45), (-0.35, 1.62), (0.2, 1.62), (0.52, 0.98)], -0.56, 0.56, BODY)
+    box(bm, -0.55, 0.18, -0.575, 0.575, 1.08, 1.45, GLASS)
+    extrude(bm, [(0.27, 1.08), (0.4, 1.08), (0.2, 1.5), (0.12, 1.5)], -0.5, 0.5, GLASS)
+    box(bm, 1.7, 1.78, -0.24, 0.24, 0.5, 0.9, LIGHT)
+    for sy in (-1, 1):
+        box(bm, 1.48, 1.66, sy * 0.45 - 0.09, sy * 0.45 + 0.09, 0.76, 0.93, LIGHT)
+        box(bm, -0.7, 0.75, sy * 0.72 - 0.13, sy * 0.72 + 0.13, 0.36, 0.42, BLACK)
+        for x in (1.15, -1.15):
+            fender(bm, x, sy * 0.74 - 0.14, sy * 0.74 + 0.14, 0.48)
+            wheel(bm, x, sy * 0.70, 0.35)
+
+
+def van(bm):
+    """Delivery van: cab, box body with a rounded roof."""
+    extrude(bm, [(-2.3, 0.6), (-2.3, 2.05), (-2.1, 2.3), (0.35, 2.3), (0.45, 2.05), (0.45, 0.6)], -0.92, 0.92, BODY)
+    extrude(bm, [(0.45, 0.6), (0.45, 2.1), (1.15, 2.05), (1.4, 1.35), (1.4, 0.6)], -0.82, 0.82, BODY)
+    box(bm, 0.62, 1.12, -0.835, 0.835, 1.45, 1.9, GLASS)
+    extrude(bm, [(1.38, 0.6), (1.38, 1.35), (2.25, 1.2), (2.38, 0.95), (2.38, 0.6)], -0.45, 0.45, BODY)
+    box(bm, 2.36, 2.43, -0.27, 0.27, 0.65, 1.1, LIGHT)
+    box(bm, -2.1, 0.25, -0.935, 0.935, 1.25, 1.75, LIGHT)                     # painted panel
+    for sy in (-1, 1):
+        box(bm, 2.12, 2.32, sy * 0.58 - 0.09, sy * 0.58 + 0.09, 0.92, 1.1, LIGHT)
+        for x in (1.8, -1.55):
+            fender(bm, x, sy * 0.84 - 0.17, sy * 0.84 + 0.17, 0.55)
+            wheel(bm, x, sy * 0.845, 0.41, 0.2)
+
+
+KINDS = {"sedan": sedan, "bus": bus, "truck": truck, "cart": cart,
+         "bus_city": bus_city, "coupe": coupe, "van": van}
 
 
 def make(kind):

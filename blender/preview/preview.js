@@ -25,7 +25,7 @@
   controls.maxPolarAngle = Math.PI / 2 - 0.02;
   scene.add(new THREE.HemisphereLight(0xdfeaf6, 0x8f8e88, 0.45));
   const sun = new THREE.DirectionalLight(0xfff0d6, 0.85);
-  sun.position.set(-81, 50, 30);                       // WSW, 30 degrees, same as Blender
+  sun.position.set(-63, 74, 23);                       // WSW, 30 degrees, same as Blender
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.normalBias = 0.35;

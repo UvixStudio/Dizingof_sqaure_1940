@@ -9,19 +9,29 @@ Chain, sweep, slab, post, column, awning, solid, drop_loops = (
 PLASTER, GLASS, FRAME, AWNING, ROOF, SHUTTER = range(6)
 
 BASE = {"ground": 4.0, "floor": 3.4, "floors": 2, "style": "bands", "recess": 0.9, "tint": "wall_white",
-        "awnings": "all", "columns": (0.0, 1.0), "penthouse": False, "roofboxes": 2, "tower": None,
+        "columns": (0.0, 1.0), "penthouse": False, "roofboxes": 2, "tower": None,
         "attic": 0.0, "hip": False, "ends": None}
 BLOCKS = {
-    149270708: ("A", {"tint": "wall_warm", "penthouse": True}),
-    495367849: ("B", {"style": "balcony", "floors": 3, "ground": 3.7, "floor": 3.2, "recess": 1.9, "tint": "wall_esther",
-                      "hip": True, "attic": 3.15, "ends": ((46.9, 40.4), (65.3, -2.0)), "awnings": (0, 2),
+    149270708: ("A", {"tint": "wall_white", "penthouse": True}),
+    495367849: ("B", {"style": "balcony", "floors": 3, "ground": 3.7, "floor": 3.2, "recess": 1.9, "tint": "wall_white",
+                      "hip": True, "attic": 3.15, "ends": ((46.9, 40.4), (65.3, -2.0)),
                       "columns": (0.45, 1.0), "roofboxes": 0,
                       "tower": {"corner": (50.6, 1.6), "before": 7.5, "after": 3.0}}),
-    495912832: ("C", {"recess": 1.3, "tint": "wall_cream", "roofboxes": 3}),
+    495912832: ("C", {"recess": 1.3, "tint": "wall_white", "roofboxes": 3}),
     495912626: ("D", {"penthouse": True, "tint": "wall_white"}),
-    495912569: ("E", {"recess": 1.1, "tint": "wall_warm", "penthouse": True, "awnings": "alt"}),
-    296103022: ("F", {"tint": "wall_cream", "recess": 0.8, "roofboxes": 3}),
+    495912569: ("E", {"recess": 1.1, "tint": "wall_white", "penthouse": True}),
+    296103022: ("F", {"tint": "wall_white", "recess": 0.8, "roofboxes": 3}),
 }
+
+
+_sweep = sweep
+
+
+def sweep(bm, ch, s0, s1, profile, mat):
+    """Glass, frames and shutters stop 3 cm short, so their ends never share a plane with the wall ends."""
+    if mat in (GLASS, FRAME, SHUTTER) and s1 - s0 > 0.2:
+        s0, s1 = s0 + 0.03, s1 - 0.03
+    _sweep(bm, ch, s0, s1, profile, mat)
 
 
 def auto_ends(outline):
@@ -56,7 +66,8 @@ def block(outline, over):
         corner = ch.s_near(T["corner"])
         t0, t1 = corner - T["before"], min(L, corner + T["after"])
     bm = bmesh.new()
-    core = drop_loops([ch.at(s, B - 0.05)[0] for s in ch.s]) + ch.rest
+    inner = max(B - 0.05, max(1.45, B - 0.5) + 0.08)                # always behind the shop glass
+    core = drop_loops([ch.at(s, inner)[0] for s in ch.s]) + ch.rest
     solid(bm, core, 0.0, top + 0.2, PLASTER)
 
     # ground floor: shopfronts behind columns, fascia, awnings
@@ -78,14 +89,6 @@ def block(outline, over):
         for k in (1, 3):
             post(bm, ch, s + k * 1.05, back - 0.07, 0.07, 0.12, 0.45, G - 0.6, FRAME)
         s += 4.2
-    s, k = 0.9, 0
-    while s + 3.5 < min(t0, L - 0.3):
-        aw = P["awnings"]
-        if aw == "all" or (aw == "alt" and k % 2 == 0) or (isinstance(aw, tuple) and k + 1 in (aw[0] + 1, aw[1])):
-            awning(bm, ch, s, s + 3.5, AWNING)
-        s += 4.2
-        k += 1
-
     # upper floors
     for i in range(N):
         z = G + H * i
@@ -131,7 +134,7 @@ def block(outline, over):
     else:
         sweep(bm, ch, 0, t0, slab(top + 1.15, top + 1.27, -0.12, 0.32), PLASTER)
 
-    info = {}
+    info = {"chain": ch, "G": G, "H": H, "t0": t0, "tower": corner if T else L, "top": top, "attic": P["attic"]}
     if T:                                         # blank corner wall, flush with the attic
         th = top + P["attic"]
         sweep(bm, ch, t0, t1, slab(G, th, 0.05, B), PLASTER)

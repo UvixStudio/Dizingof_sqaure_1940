@@ -1,6 +1,6 @@
 """Generate blender/preview/site/ from facelift/: same UI, geometry replaced by the Blender GLB.
 Run from anywhere:  python blender/make_site.py   (safe to re-run, facelift/ is only read)."""
-import os, re, shutil
+import json, os, re, shutil, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "facelift")
@@ -33,7 +33,11 @@ html = html[:a] + """      <li>גרסת עבודה: המודל נבנה בבלנ
       <li>צורות הבניינים וכיווני הרחובות מ־OpenStreetMap, © תורמי OpenStreetMap. טרם אומת אילו מהבניינים עמדו ב־1940.</li>
       <li>קולנוע אסתר הותאם לתצלומים. החזיתות של שאר הבניינים, הצבעים והרכבים הם פרשנות.</li>
       <li>טבעות הגן, הכביש והמזרקה נמדדו מתצלומים, בדיוק משוער.</li>
+      <li>חלק משמות העסקים לקוחים מתצלומים ומוויקיפדיה, השאר כלליים. מיקום החנויות, צבעי הסככות והכרזה הגדולה הם שחזור.</li>
 """ + html[b:]
+# a new address on every build, so a browser never keeps running yesterday's scene.js
+BUILD = int(time.time())
+html = rep(html, 'src="scene.js"', 'src="scene.js?v=%d"' % BUILD)
 open(os.path.join(OUT, "index.html"), "w", encoding="utf-8").write(html)
 
 js = read("scene.js")
@@ -91,10 +95,11 @@ js = js[:i] + """// ---------- replace the procedural geometry with the Blender 
   signs.forEach((s) => { keep.add(s); keep.add(s.userData.stem); });
   hotspots.forEach((h) => { keep.add(h.sp); keep.add(h.ring); });
   scene.children.slice().forEach((o) => { if (!keep.has(o) && !o.isLight && !o.userData.keep) scene.remove(o); });
-  sun.color.set(0xfffaf2);
-  scene.children.filter((o) => o.isHemisphereLight).forEach((h) => { h.color.set(0xdfeaf6); h.groundColor.set(0x8f8e88); });
-  sun.position.set(-81, 50, 30);                      // bearing 250, 30 degrees, as in Blender
-  sun.intensity = .72; sun.shadow.bias = -.0004; sun.shadow.normalBias = .6;
+  sun.color.set(0xffedd2);
+  scene.children.filter((o) => o.isHemisphereLight).forEach((h) => { h.color.set(0xeaf2fb); h.groundColor.set(0xb4b0a6); h.intensity = .56; });
+  sun.position.set(-80, 53, 29);                      // bearing 250, 32 degrees, as in Blender
+  Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70 }); sun.shadow.camera.updateProjectionMatrix();
+  sun.intensity = .88; sun.shadow.bias = -.0004; sun.shadow.normalBias = .35; sun.shadow.radius = 3;
   function loadModel(t) {
     new THREE.GLTFLoader().load("../kikar.glb?t=" + t, (g) => {
       const old = scene.getObjectByName("blender");
@@ -105,15 +110,151 @@ js = js[:i] + """// ---------- replace the procedural geometry with the Blender 
         if (!o.isMesh) return;
         o.castShadow = o.receiveShadow = true;
         const m = o.material;
+        if (m.alphaTest > 0) o.castShadow = false;            // every mesh that uses a cut-out, not only the first
         if (done.has(m)) return;
         done.add(m);
-        if (m.alphaTest > 0) { m.side = THREE.DoubleSide; o.castShadow = false; }
+        if (m.alphaTest > 0) m.side = THREE.DoubleSide;
+        if (m.name.indexOf("leafcard") === 0) m.onBeforeCompile = (sh) => {      // both faces lit like the round crown
+          sh.fragmentShader = sh.fragmentShader.replace("#include <normal_fragment_begin>", "vec3 normal = normalize(vNormal); vec3 geometryNormal = normal;");
+        };
         if (m.map) { m.map.encoding = THREE.LinearEncoding; m.map.anisotropy = 8; m.map.needsUpdate = true; }   // renderer writes values directly
         else m.color.convertLinearToSRGB();
       });
       scene.add(g.scene);
+      collect(g.scene);
+      merge(g.scene);
     });
   }
+  // ---------- building labels (cream plates, so they are not mistaken for street names) + Esther card ----------
+  const LABELS = { B: ["קולנוע כיכר דיזנגוף", "לימים קולנוע אסתר"], D: ["בתי פלדמן וגרינמן", "1935-36 · המיקום לאימות"],
+                   F: ["בית מירנברג", "1936 · ג'ניה אוורבוך · המיקום לאימות"] };
+  const labelTex = (name, sub) => canvasTex(896, 320, (x) => {
+    rr(x, 6, 6, 884, 308, 34); x.fillStyle = "rgba(244,234,208,.93)"; x.fill();
+    x.strokeStyle = "#9a7b3f"; x.lineWidth = 7; rr(x, 22, 22, 852, 276, 24); x.stroke();
+    x.fillStyle = "#3d2a1c"; x.font = "700 118px " + SERIF; x.fillText(name, 448, 128, 810);
+    x.font = "500 58px " + SERIF; x.fillText(sub, 448, 238, 810);
+  });
+  CARDS.esther = {
+    title: "קולנוע כיכר דיזנגוף", by: "לימים קולנוע אסתר", sub: "נבנה ב־1938 עד 1939",
+    body: [
+      "את הבניין תכננו האדריכל יהודה מגידוביץ' ובנו, המהנדס רפאל מגידו, עבור אסתר ומשה נתנאל. הוא עומד על עמודים ובחזית קעורה עם מרפסות סרט.",
+      "שבוע הפתיחה התחיל ב־30 במרץ 1939, והסרט הראשון היה שלגיה ושבעת הגמדים. באולם היו כ־1,000 מקומות, והוא תואר כראשון בארץ עם מיזוג אוויר מרכזי.",
+      "בבניין פעלו קפה אמנות עם רחבת ריקודים, וחנות הכלבו אקמן. ב־1998 הוסב הבניין למלון.",
+      "הכרזה הגדולה על הקיר היא עיצוב של הסקיצה הזו, לא הכרזה המקורית. הכרזה על המרפסת עם שמה של אליזבת ברגנר מופיעה בגלויה מהתקופה."
+    ],
+    credit: "מקור: ויקיפדיה העברית, קולנוע אסתר.",
+    links: [{ t: "ויקיפדיה: קולנוע אסתר", u: "https://he.wikipedia.org/wiki/%D7%A7%D7%95%D7%9C%D7%A0%D7%95%D7%A2_%D7%90%D7%A1%D7%AA%D7%A8" }]
+  };
+  (async function labels() {
+    let list = [];
+    try { list = await (await fetch("labels.json?t=" + Date.now(), { cache: "no-store" })).json(); } catch (e) { return; }
+    list.forEach((b) => {
+      const y = b.top + 4.2, W = 6.4, H = 2.29, x = b.x, z = -b.y;
+      const s = new THREE.Group(); s.position.set(x, y, z); scene.add(s);
+      const m = new THREE.MeshBasicMaterial({ map: labelTex(...LABELS[b.key]), transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
+      s.userData.m = m; s.add(new THREE.Mesh(new THREE.PlaneGeometry(W, H), m));
+      const h = y - H / 2, stem = new THREE.Mesh(new THREE.PlaneGeometry(.1, h), new THREE.MeshBasicMaterial({ map: fadeTex, color: 0xffd98a, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+      stem.position.set(x, h / 2, z); scene.add(stem); s.userData.stem = stem; signs.push(s);
+      const dot = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: padTex, color: 0xffd98a, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+      dot.position.set(x, .13, z); scene.add(dot);
+      if (b.key === "B") {
+        const out = new THREE.Vector3(b.nx, 0, -b.ny), at = new THREE.Vector3(x, 5.6, z).addScaledVector(out, 1.4);
+        addHotspot("esther", "person", at, new THREE.Vector3(x, 1.7, z).addScaledVector(out, 26), new THREE.Vector3(x, 7.5, z));
+        const hs = hotspots[hotspots.length - 1];
+        hs.sp.material.map = canvasTex(128, 128, (c) => {
+          c.fillStyle = "rgba(236,223,192,.96)"; c.beginPath(); c.arc(64, 64, 60, 0, 7); c.fill();
+          c.fillStyle = "#4a3425"; c.beginPath(); c.arc(64, 64, 51, 0, 7); c.fill();
+          c.fillStyle = "#f0e3c2"; c.font = "700 76px " + SERIF; c.fillText("i", 64, 68);
+        });
+      }
+    });
+  })();
+  // ---------- traffic and people circle the square (object names come from Blender) ----------
+  let movers = [];
+  const UP = new THREE.Vector3(0, 1, 0), turn = new THREE.Quaternion();
+  function collect(root) {
+    movers = [];
+    root.children.forEach((o) => {
+      const p = o.position, r = Math.hypot(p.x, p.z), n = o.name;
+      let w = 0, bob = 0;                                   // w = angular speed; one value per lane, so gaps never close
+      if (n.startsWith("car_") && r > 37 && r < 44) w = r < 40 ? 6.5 / 38.4 : r < 42.8 ? 7.5 / 41.2 : 1.5 / 43.35;
+      else if (n.startsWith("walk_a")) { w = 1.0 / 17.5; bob = 1; }
+      else if (n.startsWith("walk_b")) { w = 1.1 / 21.7; bob = 1; }
+      else if (n.startsWith("walk_c")) { w = 0.95 / 23.4; bob = 1; }
+      else if (n.startsWith("pram_")) w = 0.75 / 18.9;
+      else if (n.startsWith("kidbike_")) w = 2.3 / 20.3;
+      else if (n.startsWith("cycle_")) w = 3.6 / 36.7;
+      if (!w) return;
+      const nose = new THREE.Vector3(1, 0, 0).applyQuaternion(o.quaternion);          // Blender forward is +X
+      const sign = Math.sign(nose.x * p.z - nose.z * p.x) || 1;                        // drive nose first
+      movers.push({ o, w: w * sign, y: p.y, bob, ph: Math.random() * 6 });
+    });
+  }
+  // one draw call per material for everything that stands still (phones choke on hundreds of calls)
+  function merge(root) {
+    root.updateMatrixWorld(true);
+    const moving = new Set();
+    movers.forEach((m) => m.o.traverse((c) => moving.add(c)));
+    const groups = new Map();
+    root.traverse((o) => {
+      if (!o.isMesh || moving.has(o) || o.children.length) return;
+      const g = o.geometry;
+      if (!g.attributes.normal) return;
+      const key = o.material.uuid + (o.castShadow ? "s" : "") + (g.attributes.uv ? "u" : "");
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(o);
+    });
+    const v = new THREE.Vector3(), nm = new THREE.Matrix3();
+    groups.forEach((list) => {
+      if (list.length < 2) return;
+      let nv = 0, ni = 0;
+      list.forEach((o) => { const g = o.geometry; nv += g.attributes.position.count; ni += g.index ? g.index.count : g.attributes.position.count; });
+      const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), index = new Uint32Array(ni);
+      const uv = list[0].geometry.attributes.uv ? new Float32Array(nv * 2) : null;
+      let av = 0, ai = 0;
+      list.forEach((o) => {
+        const g = o.geometry, p = g.attributes.position, n = g.attributes.normal, t = g.attributes.uv;
+        nm.getNormalMatrix(o.matrixWorld);
+        for (let i = 0; i < p.count; i++) {
+          v.set(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(o.matrixWorld); v.toArray(pos, (av + i) * 3);
+          v.set(n.getX(i), n.getY(i), n.getZ(i)).applyMatrix3(nm).normalize(); v.toArray(nor, (av + i) * 3);
+          if (uv) { uv[(av + i) * 2] = t.getX(i); uv[(av + i) * 2 + 1] = t.getY(i); }
+        }
+        const c = g.index ? g.index.count : p.count;
+        for (let i = 0; i < c; i++) index[ai + i] = av + (g.index ? g.index.getX(i) : i);
+        av += p.count; ai += c;
+      });
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute("normal", new THREE.BufferAttribute(nor, 3));
+      if (uv) geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+      geo.setIndex(new THREE.BufferAttribute(index, 1));
+      const one = new THREE.Mesh(geo, list[0].material);
+      one.castShadow = list[0].castShadow; one.receiveShadow = true;
+      list.forEach((o) => o.parent.remove(o));
+      root.add(one);
+    });
+  }
+  camera.near = .4; camera.updateProjectionMatrix();
+  window.__render = () => renderer.info.render;      // for checking the load from the console
+  let before = null;
+  function drive(now) {
+    const dt = before === null ? 0 : Math.min((now - before) / 1000, .05); before = now;
+    if (!reduce) movers.forEach((m) => {
+      m.o.position.applyAxisAngle(UP, m.w * dt);
+      m.o.quaternion.premultiply(turn.setFromAxisAngle(UP, m.w * dt));
+      if (m.bob) m.o.position.y = m.y + Math.abs(Math.sin(now / 160 + m.ph)) * .035;
+    });
+    requestAnimationFrame(drive);
+  }
+  requestAnimationFrame(drive);
+  const BUILD = __BUILD__;
+  setInterval(async () => {
+    try {
+      const v = await (await fetch("build.json?t=" + Date.now(), { cache: "no-store" })).json();
+      if (v.build > BUILD) location.replace("index.html?v=" + v.build);
+    } catch (e) { /* hosted copy or offline: keep what is loaded */ }
+  }, 5000);
   let stamp = null;
   (async function poll() {
     try {
@@ -123,5 +264,27 @@ js = js[:i] + """// ---------- replace the procedural geometry with the Blender 
     setTimeout(poll, 4000);
   })();
   """ + js[i:]
-open(os.path.join(OUT, "scene.js"), "w", encoding="utf-8").write(js)
+# sky: panorama made from the same HDRI as in Blender (sky.py writes sky.jpg and sky.json)
+haze = json.load(open(os.path.join(OUT, "sky.json")))["haze"]
+js = rep(js, "const HAZE = 0xe6e2d3;", "const HAZE = %s;" % haze)
+a = js.index("  // ---------- sky: watercolour dome")
+b = js.index("  // ---------- canvas textures")
+js = js[:a] + """  // ---------- sky: HDRI panorama, texture column = compass bearing / 360 ----------
+  const sky = new THREE.Group(); scene.add(sky);
+  {
+    const sg = new THREE.SphereGeometry(480, 64, 40), uv = sg.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setX(i, .75 - uv.getX(i));
+    const mat = new THREE.MeshBasicMaterial({ color: HAZE, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false });
+    new THREE.TextureLoader().load("sky.jpg", (t) => {
+      t.wrapS = THREE.RepeatWrapping; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+      mat.map = t; mat.color.set(0xffffff); mat.needsUpdate = true;
+    });
+    const dome = new THREE.Mesh(sg, mat);
+    dome.renderOrder = -10; sky.add(dome);
+  }
+
+""" + js[b:]
+open(os.path.join(OUT, "scene.js"), "w", encoding="utf-8").write(rep(js, "__BUILD__", str(BUILD)))
+with open(os.path.join(OUT, "build.json"), "w") as f:        # written last: scene.js is already complete
+    json.dump({"build": BUILD}, f)
 print("site written to", OUT)

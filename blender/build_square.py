@@ -111,6 +111,14 @@ def box_uv(me):
 
 
 def finish(name, bm, mats, c, smooth=False):
+    zs = [v.co.z for v in bm.verts]
+    if zs and max(zs) - min(zs) < 1e-5:            # flat ground sheet: face the sky
+        bm.normal_update()
+        for f in bm.faces:
+            if f.normal.z < 0:
+                f.normal_flip()
+    else:
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
@@ -265,7 +273,7 @@ def building(name, pts, levels, M, c):
 
 
 # --- build ------------------------------------------------------------------
-def build():
+def build(ficus="mature"):      # "young" = caged saplings of 1938-40, "mature" = shade trees
     scene = bpy.context.scene
     root = coll("BUILD")
     wipe(root)
@@ -275,7 +283,10 @@ def build():
         "paving": tex_mat("paving", "paving.jpg", 4.0, 0.92),
         "asphalt": tex_mat("asphalt", "asphalt.jpg", 6.0, 0.95),
         "gravel": tex_mat("gravel", "gravel.jpg", 3.0, 1.0),
-        "grass": tex_mat("grass", "grass.jpg", 4.0, 1.0),
+        "grass": tex_mat("grass", "grass.jpg", 64.0, 1.0),
+        "blade_green": flat_mat("blade_green", (0.115, 0.205, 0.032), 1.0),
+        "blade_dark": flat_mat("blade_dark", (0.065, 0.125, 0.022), 1.0),
+        "blade_dry": flat_mat("blade_dry", (0.30, 0.235, 0.075), 1.0),
         "concrete": tex_mat("concrete", "concrete.jpg", 2.0, 0.85),
         "plaster": tex_mat("plaster", "plaster.jpg", 6.0, 0.9),
         "hedge": tex_mat("hedge", "hedge.jpg", 2.0, 1.0),
@@ -289,6 +300,11 @@ def build():
         "car_black": flat_mat("car_black", (0.012, 0.012, 0.014), 0.25),
         "car_green": flat_mat("car_green", (0.035, 0.07, 0.05), 0.35),
         "car_grey": flat_mat("car_grey", (0.42, 0.40, 0.33), 0.4),
+        "car_maroon": flat_mat("car_maroon", (0.12, 0.018, 0.016), 0.3),
+        "car_navy": flat_mat("car_navy", (0.016, 0.035, 0.09), 0.3),
+        "car_cream": flat_mat("car_cream", (0.66, 0.57, 0.38), 0.35),
+        "bus_blue": flat_mat("bus_blue", (0.16, 0.25, 0.30), 0.4),
+        "sign_dark": flat_mat("sign_dark", (0.03, 0.03, 0.035), 0.6, two_sided=True),
         "car_light": flat_mat("car_light", (0.65, 0.63, 0.56), 0.35),
         "horse": flat_mat("horse", (0.09, 0.045, 0.02), 0.9),
         "tyre": flat_mat("tyre", (0.01, 0.01, 0.01), 0.8),
@@ -296,6 +312,20 @@ def build():
         "promenade": tex_mat("promenade", "promenade.jpg", 4.0, 0.95),
         "stone": tex_mat("stone", "stone.jpg", 1.6, 0.85),
         "flowers": tex_mat("flowers", "flowers.jpg", 1.4, 0.9),
+        "leafcard_a": alpha_mat("leafcard_a", "leaf_a.png"),
+        "leafcard_b": alpha_mat("leafcard_b", "leaf_b.png"),
+        "leafcard_c": alpha_mat("leafcard_c", "leaf_c.png"),
+        "leaf_core": flat_mat("leaf_core", (0.030, 0.062, 0.016), 1.0),
+        "ficus_bark": flat_mat("ficus_bark", (0.19, 0.17, 0.14), 0.95),
+        "people": tex_mat("people", "people.png", 1.0, 0.85),
+        "signs": tex_mat("signs", "signs.jpg", 1.0, 0.7),
+        "poster": tex_mat("poster", "poster_snow.jpg", 1.0, 0.6),
+        "aw_white": flat_mat("aw_white", (0.74, 0.71, 0.62), 0.9, two_sided=True),
+        "aw_cream": flat_mat("aw_cream", (0.72, 0.55, 0.28), 0.9, two_sided=True),
+        "aw_green": flat_mat("aw_green", (0.10, 0.25, 0.17), 0.9, two_sided=True),
+        "aw_terra": flat_mat("aw_terra", (0.38, 0.09, 0.05), 0.9, two_sided=True),
+        "aw_blue": flat_mat("aw_blue", (0.07, 0.14, 0.27), 0.9, two_sided=True),
+        "table": flat_mat("table", (0.80, 0.78, 0.72), 0.4),
         "lattice": alpha_mat("lattice", "lattice.png"),
         "cage": alpha_mat("cage", "cage.png"),
         "bench_wood": flat_mat("bench_wood", (0.07, 0.04, 0.022), 0.6),
@@ -331,19 +361,20 @@ def build():
     annulus("ring_road", ROAD[0], ROAD[1], 0.02, M["asphalt"], cg)
     ring_wall("road_curb", ROAD[1], ROAD[1] + 0.3, 0.0, 0.15, M["concrete"], cg)
     for nm, brg in STREETS.items():
-        strip("street_" + nm, brg, ROAD[1] - 1, CITY_R + 40, STREET_W, 0.021, M["asphalt"], cg)
+        strip("street_" + nm, brg, ROAD[1], CITY_R + 40, STREET_W, 0.021, M["asphalt"], cg)
 
     # island (blender/island.py shares this script's helpers)
-    scope = dict(globals(), M=M, ci=ci, cp=cp, water=water, jet_m=jet_m)
+    people = runpy.run_path(os.path.join(ROOT, "blender", "people.py"), init_globals=dict(globals()))
+    scope = dict(globals(), FICUS=ficus, SITTERS=people["sitters"](M), M=M, ci=ci, cp=cp, water=water, jet_m=jet_m)
     runpy.run_path(os.path.join(ROOT, "blender", "island.py"), init_globals=scope)
 
     # vehicles on the ring road, counter-clockwise (placeholders, 1930s silhouettes)
     veh = runpy.run_path(os.path.join(ROOT, "blender", "vehicles.py"))
-    colours = {"black": M["car_black"], "green": M["car_green"], "grey": M["car_grey"], "horse": M["horse"]}
+    colours = {"black": M["car_black"], "green": M["car_green"], "grey": M["car_grey"], "horse": M["horse"],
+               "maroon": M["car_maroon"], "navy": M["car_navy"], "cream": M["car_cream"], "blue": M["bus_blue"]}
     cache = {}
-    for kind, colour, r, brg in (("sedan", "black", 38.2, 22), ("sedan", "green", 41.8, 74), ("truck", "green", 38.4, 128),
-                                 ("sedan", "black", 41.6, 158), ("bus", "grey", 41.2, 214), ("cart", "horse", 38.6, 256),
-                                 ("sedan", "grey", 41.8, 286), ("sedan", "black", 38.2, 318), ("bus", "grey", 41.4, 4)):
+
+    def vehicle(kind, colour, loc, rot):
         if (kind, colour) not in cache:
             me = bpy.data.meshes.new("veh_" + kind)
             bm = veh["make"](kind)
@@ -353,12 +384,41 @@ def build():
                 me.materials.append(m)
             box_uv(me)
             cache[(kind, colour)] = me
+        o = instance("car_" + kind, cache[(kind, colour)], loc, rot, cp)
+        if kind in ("bus", "bus_city"):          # cooperative name on both sides (reversed for RTL); placement is interpretation
+            x, y, z = (-0.4, 1.17, 1.12) if kind == "bus" else (-0.4, 1.12, 0.92)
+            for side in (-1, 1):
+                t = lettering("sign_bus", "ריבעמה", (x, side * y, z), (0, side), 0.36,
+                              M["sign_dark"] if kind == "bus_city" and colour == "cream" else M["car_light"], cp)
+                t.parent = o
+
+    # ring road, two lanes, counter-clockwise
+    for kind, colour, r, brg in (("sedan", "black", 38.2, 22), ("coupe", "maroon", 38.4, 50), ("bus_city", "cream", 38.5, 88),
+                                 ("truck", "green", 38.4, 128), ("sedan", "navy", 38.2, 160), ("bus", "grey", 38.5, 197),
+                                 ("cart", "horse", 43.35, 256), ("sedan", "grey", 38.4, 256), ("van", "cream", 38.4, 288), ("sedan", "black", 38.2, 318),
+                                 ("sedan", "green", 41.2, 66), ("sedan", "black", 41.2, 142), ("bus_city", "blue", 41.2, 220),
+                                 ("coupe", "black", 41.2, 252), ("sedan", "grey", 41.2, 300), ("bus", "grey", 41.2, 4),
+                                 ("van", "maroon", 41.2, 340)):
         a = math.radians(brg)
-        instance("car_" + kind, cache[(kind, colour)], polar(r, brg, 0.02), math.atan2(math.sin(a), -math.cos(a)), cp)
+        vehicle(kind, colour, polar(r, brg, 0.02), math.atan2(math.sin(a), -math.cos(a)))
+    # parked or driving along the side streets (r = distance out, side = -1 / 1 of the street axis)
+    for street, r, side, kind, colour in (("Dizengoff N", 58, 1, "sedan", "black"), ("Dizengoff N", 74, -1, "bus_city", "cream"),
+                                          ("Reines", 63, -1, "coupe", "navy"), ("Zamenhof", 56, 1, "van", "cream"),
+                                          ("Zamenhof", 79, -1, "sedan", "maroon"), ("Dizengoff S", 61, -1, "sedan", "green"),
+                                          ("Dizengoff S", 83, 1, "truck", "green"), ("Pinsker", 58, 1, "sedan", "grey"),
+                                          ("Pinsker", 66, 1, "coupe", "black"), ("Ben Ami", 60, -1, "cart", "horse")):
+        brg = math.radians(STREETS[street])
+        out = Vector((math.sin(brg), math.cos(brg), 0))
+        across = Vector((out.y, -out.x, 0)) * side
+        ahead = out * -side                      # keeps to the right-hand side of its direction
+        vehicle(kind, colour, out * r + across * 2.9 + Vector((0, 0, 0.022)), math.atan2(ahead.y, ahead.x))
 
     # OSM buildings (today's footprints, 1940 filter pending), heights capped
     data = json.load(open(os.path.join(ROOT, "data", "osm", "square_raw.json"), encoding="utf-8"))
     ring = runpy.run_path(os.path.join(ROOT, "blender", "ring.py"))
+    shops = runpy.run_path(os.path.join(ROOT, "blender", "shops.py"), init_globals=dict(globals()))
+    M["signs"].use_backface_culling = False
+    labels = []
     n = 0
     for e in data["elements"]:
         t = e.get("tags", {})
@@ -379,7 +439,13 @@ def build():
             bm, info = ring["block"](pts, params)
             wall = M[params.get("tint", "wall_white")]
             finish(key + "_block", bm, [wall, M["glass"], M["frame"], M["awning"], M["tin"], M["shutter"]], cb)
-            if info:                                   # Esther cinema lettering (1940 postcard)
+            shops["dress"](key, info, M, cb)
+            if key in ("B", "D", "F"):                 # where the site hangs a building label
+                p, normal = info["chain"].at(info["chain"].length * 0.5, -0.8)
+                labels.append({"key": key, "x": round(p.x, 2), "y": round(p.y, 2),
+                               "top": round(info["top"] + info["attic"], 2),
+                               "nx": round(-normal.x, 3), "ny": round(-normal.y, 3)})
+            if "name" in info:                         # Esther cinema lettering (1940 postcard)
                 x, y, z, nx, ny = info["name"]
                 for k, word in enumerate(("קולנוע", "כיכר", "דיזנגוף")):
                     lettering("sign_name_%d" % k, word[::-1], (x, y, z - 0.85 * k), (nx, ny), 0.85, M["red"], cb)
@@ -389,29 +455,27 @@ def build():
         elif building("osm_%d" % e["id"], pts, max(2, min(MAX_LEVELS_1940, lv)), M, cb):
             n += 1
 
-    # sun + sky
+    for k, bearing in enumerate((57, 240)):
+        shops["ad_column"]("ad_column_%d" % k, polar(45.7, bearing).to_2d(), M, cp)
+    site = os.path.join(ROOT, "blender", "preview", "site")
+    os.makedirs(site, exist_ok=True)
+    with open(os.path.join(site, "labels.json"), "w", encoding="utf-8") as f:
+        json.dump(labels, f)
+
+    people["populate"](M, cp)
+
+    # sun + sky: HDRI daylight (sky.py), sun lamp placed where the HDRI sun is
+    sk = runpy.run_path(os.path.join(ROOT, "blender", "sky.py"))
     sun_d = bpy.data.lights.new("sun", "SUN")
-    sun_d.energy = 4.0
-    sun_d.angle = math.radians(0.8)
-    sun_d.color = (1.0, 0.98, 0.95)
+    sun_d.energy = sk["SUN_ENERGY"]
+    sun_d.angle = math.radians(0.6)
+    sun_d.color = sk["SUN_COLOR"]
     sun = bpy.data.objects.new("sun", sun_d)
     cl.objects.link(sun)
-    sun.rotation_euler = (math.radians(60), 0, math.radians(-70))   # from bearing 250, 30 deg high
+    sun.rotation_euler = (math.radians(90 - sk["SUN_ELEV"]), 0, math.radians(180 - sk["SUN_BEARING"]))
     world = scene.world or bpy.data.worlds.new("World")
     scene.world = world
-    world.use_nodes = True
-    wn = world.node_tree.nodes
-    wn.clear()
-    sky = wn.new("ShaderNodeTexSky")
-    sky.sky_type = "MULTIPLE_SCATTERING"
-    sky.sun_disc = False
-    sky.sun_elevation = math.radians(30)
-    sky.sun_rotation = math.radians(250)
-    bg = wn.new("ShaderNodeBackground")
-    bg.inputs["Strength"].default_value = 0.12
-    wo = wn.new("ShaderNodeOutputWorld")
-    world.node_tree.links.new(sky.outputs[0], bg.inputs[0])
-    world.node_tree.links.new(bg.outputs[0], wo.inputs[0])
+    sk["apply_world"](world)
 
     # cameras (same names as the site views)
     def camera(name, loc, direction, vfov):
@@ -456,6 +520,7 @@ def build():
     scene.eevee.taa_render_samples = 64
     scene.view_settings.view_transform = "AgX"
     scene.view_settings.look = "AgX - Medium High Contrast"
+    scene.view_settings.exposure = -0.3
     return {"buildings": n}
 
 

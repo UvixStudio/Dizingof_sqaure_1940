@@ -1,5 +1,5 @@
 """Render the four views and export a GLB for blender/preview/index.html (run inside Blender)."""
-import bpy, json, os, time
+import bpy, json, os, runpy, time
 
 ROOT = r"C:\Ai\01_kikar_dizingof"
 
@@ -41,6 +41,7 @@ def publish():
     blend_with_photo(out, "esther", "219fab55-image.jpg")
     blend_with_photo(out, "mat", os.path.join("update", "MAT-22292-DIZ.jpg"))
     scene.camera = main
+    runpy.run_path(os.path.join(ROOT, "blender", "sky.py"))["export_web"]()
 
     bpy.ops.object.select_all(action="DESELECT")
     meshes = [o for o in bpy.data.collections["BUILD"].all_objects
