@@ -111,8 +111,8 @@ body.night .lang-btn { color: #fff; text-shadow: 0 0 8px rgba(0,0,0,.65); }     
 .card .rights a { color: inherit; text-decoration: underline; }
 
 /* during the opening only the title is there; the rest arrives with the square (web/intro.js) */
-.bar, .quick, .lang-btn { transition: opacity .6s ease; }
-body.intro .bar, body.intro .quick, body.intro .lang-btn, body.intro .gesture, body.intro .hint { opacity: 0 !important; visibility: hidden; pointer-events: none; }
+.bar, .quick, .lang-btn, .sound-btn { transition: opacity .6s ease; }
+body.intro .bar, body.intro .quick, body.intro .lang-btn, body.intro .sound-btn, body.intro .gesture, body.intro .hint { opacity: 0 !important; visibility: hidden; pointer-events: none; }
 .skip { position: fixed; z-index: 8; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); transform: translateX(-50%); display: flex; align-items: center; gap: 2px; min-height: 38px; padding: 0 12px 0 16px;
   border: 1px solid rgba(29,42,90,.22); border-radius: 999px; background: rgba(255,255,255,.55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: var(--blue); font: 600 .84rem/1 var(--body); cursor: pointer; }
 .skip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
@@ -276,3 +276,39 @@ html[dir="ltr"] .tour-next span { display: inline-block; transform: scaleX(-1); 
 .card h4 { font-size: 1.18rem; color: rgba(255,255,255,.9); }
 .card .films li { font-size: .9rem; }
 
+/* turn with the phone: a small light on its button, empty when off and green when on; also on the camera button, as the menu closes */
+#gyro::after, .menu #gyro[aria-checked="true"]::after { content: ""; flex: 0 0 auto; width: 10px; height: 10px; margin-inline-end: 3px; border-radius: 50%; background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; opacity: .6; }
+.menu #gyro[aria-checked="true"]::after { background: #27c45a; box-shadow: 0 0 0 3px rgba(39,196,90,.3); opacity: 1; }
+.drop-btn[aria-controls="cam-menu"] { position: relative; }
+.bar:has(#gyro[aria-checked="true"]) .drop-btn[aria-controls="cam-menu"]::after { content: ""; position: absolute; top: -4px; inset-inline-end: -3px; width: 11px; height: 11px; border: 2px solid #fff8e6; border-radius: 50%; background: #27c45a; }
+
+/* today against 1940: one frame and a line to drag */
+.card figure.compare { max-width: 32rem; margin-inline: auto; }
+.card .cmp { --at: 50%; position: relative; aspect-ratio: 4 / 3; overflow: hidden; direction: ltr; border: 1px solid rgba(216,199,158,.7); border-radius: 8px; background: #0b0f24; cursor: ew-resize; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.card figure.compare .cmp img { position: absolute; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; border: 0; border-radius: 0; object-fit: cover; pointer-events: none; }
+.card figure.compare .cmp img.then { -webkit-clip-path: inset(0 0 0 var(--at)); clip-path: inset(0 0 0 var(--at)); }   /* Hebrew: 1940 on the right, where reading starts */
+html[dir="ltr"] .card figure.compare .cmp img.then { -webkit-clip-path: inset(0 calc(100% - var(--at)) 0 0); clip-path: inset(0 calc(100% - var(--at)) 0 0); }
+.card .cmp i { position: absolute; top: 0; bottom: 0; left: var(--at); width: 2px; margin-left: -1px; background: #f5dfa6; box-shadow: 0 0 6px rgba(0,0,0,.6); pointer-events: none; }
+.card .cmp i::after { content: "\2039\2002\203A"; position: absolute; top: 50%; left: 50%; box-sizing: border-box; width: 40px; height: 40px; margin: -20px 0 0 -20px; display: grid; place-items: center; padding-bottom: 3px; border: 2px solid #f5dfa6; border-radius: 50%; background: rgba(29,42,90,.9); color: #f5dfa6; font: normal 700 20px/1 Heebo, sans-serif; }
+.card .cmp .tag { position: absolute; top: 8px; padding: 3px 9px; border-radius: 999px; background: rgba(10,14,34,.72); color: #fff; font-size: .72rem; font-weight: 700; line-height: 1.4; white-space: nowrap; direction: rtl; pointer-events: none; }
+.card .cmp .tag.now { left: 8px; }
+.card .cmp .tag.past { right: 8px; }
+html[dir="ltr"] .card .cmp .tag { direction: ltr; }
+html[dir="ltr"] .card .cmp .tag.now { left: auto; right: 8px; }
+html[dir="ltr"] .card .cmp .tag.past { right: auto; left: 8px; }
+@media (max-height: 600px) { .tour-tip p { font-size: .8rem; line-height: 1.4; } }
+.card figure.compare bdi { white-space: nowrap; }
+.card .cmp:focus-visible { outline: 2px solid #f5dfa6; outline-offset: 2px; }
+
+/* music on and off: in plain sight, on the other side of the title from the language */
+.sound-btn { position: fixed; z-index: 7; right: 10px; top: calc(env(safe-area-inset-top, 0px) + 22px); box-sizing: border-box; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; cursor: pointer;
+  color: var(--blue); background: rgba(255,250,235,.62); border: 1.5px solid rgba(255,255,255,.75); border-radius: 50%; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 3px 12px rgba(30,22,12,.18); }
+.sound-btn[hidden] { display: none; }
+.sound-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sound-btn .waves, .sound-btn[aria-pressed="true"] .cross { display: none; }
+.sound-btn[aria-pressed="true"] .waves { display: inline; }
+.sound-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+html[dir="ltr"] .sound-btn { right: auto; left: 10px; }
+@media (min-width: 640px) { .sound-btn { right: auto; left: 104px; } html[dir="ltr"] .sound-btn { left: auto; right: 104px; } }
+body.night .sound-btn { color: #fff; background: rgba(20,28,66,.62); border-color: rgba(255,255,255,.4); }
+body.touring .sound-btn { z-index: 21; }                                     /* it can be switched off during the tour too */

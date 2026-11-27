@@ -4,7 +4,8 @@
   const tourMenu = (id) => ({ btn: document.querySelector('[aria-controls="' + id + '"]'), list: $(id) });
   const TOUR_STEPS = [
     { title: "ברוכים הבאים לכיכר צינה (דיזנגוף)", text: "שחזור מקורי לפי התוכניות של האדריכלית ג'ניה אוורבוך, שלפיהן נחנכה כיכר צינה ב־1938: מבנה הבניינים, הרחובות, ונקודות עניין היסטוריות מהשנים הראשונות ועד היום.", next: "בואו נתחיל", at: "welcome" },
-    { title: "מצלמות", text: "בוחרים מאיפה להסתכל: מהגג, ממבט על, מתוך הכיכר או מאחורי מכונית.", menu: "cam-menu" },
+    { title: "מצלמות", menu: "cam-menu", text: $("gyro").hidden ? "בוחרים מאיפה להסתכל: מהגג, ממבט על, מתוך הכיכר או מאחורי מכונית."
+        : "בוחרים מאיפה להסתכל. ולמטה, ״סיבוב עם הטלפון״: מזיזים את הטלפון ימינה ושמאלה, כאילו עומדים בתוך הכיכר. נקודה ירוקה: פועל. נגיעה נוספת מכבה." },
     { title: "נקודות מידע", text: "סיפורים, תצלומים וסרטים. בוחרים נושא, והמצלמה לוקחת אתכם אליו.", menu: "spot-menu" },
     { title: "הסיכות בכיכר", text: TOUR_TAP + " על סיכה, והסיפור שלה נפתח.", at: "pin" },
     { title: "לסייר בסצנה, כמו בגוגל מפות", text: TOUR_TAP + " על הקרקע, מופיע עיגול, והולכים לשם. "
@@ -79,6 +80,7 @@
     q(".tour-skip").hidden = i === TOUR_STEPS.length - 1;
     tourDemo(step.at === "walk");
     if (step.menu) { const m = tourMenu(step.menu); m.btn.click(); m.btn.classList.add("tour-glow"); }
+    if (step.menu === "cam-menu" && !$("gyro").hidden) $("gyro").classList.add("tour-glow");     // the line the text is about
     tip.classList.remove("in"); q(".tour-ring").hidden = true;
     clearTimeout(TOUR.timer);
     TOUR.timer = setTimeout(() => { tourPlace(); tip.classList.add("in"); tip.focus({ preventScroll: true }); }, step.menu ? 300 : 60);     // after the menu has opened

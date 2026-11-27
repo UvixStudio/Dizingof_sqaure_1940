@@ -36,6 +36,8 @@
     "שחזור מקורי לפי התוכניות של האדריכלית ג'ניה אוורבוך, שלפיהן נחנכה כיכר צינה ב־1938: מבנה הבניינים, הרחובות, ונקודות עניין היסטוריות מהשנים הראשונות ועד היום.":
       "An original reconstruction after the plans of architect Genia Averbuch, by which the square opened in 1938: the buildings, the streets, and points of history from its first years to today.",
     "בוחרים מאיפה להסתכל: מהגג, ממבט על, מתוך הכיכר או מאחורי מכונית.": "Choose where to look from: a rooftop, bird's eye, inside the square or behind a car.",
+    "בוחרים מאיפה להסתכל. ולמטה, ״סיבוב עם הטלפון״: מזיזים את הטלפון ימינה ושמאלה, כאילו עומדים בתוך הכיכר. נקודה ירוקה: פועל. נגיעה נוספת מכבה.":
+      "Pick a view. At the bottom, Turn with phone: swing your phone to look around as if you were there. Green dot: on. Tap again for off.",
     "סיפורים, תצלומים וסרטים. בוחרים נושא, והמצלמה לוקחת אתכם אליו.": "Stories, photographs and films. Pick one and the camera takes you there.",
     "הסיכות בכיכר": "Pins in the square", "נוגעים על סיכה, והסיפור שלה נפתח.": "Tap a pin to open its story.", "לוחצים על סיכה, והסיפור שלה נפתח.": "Click a pin to open its story.",
     "לסייר בסצנה, כמו בגוגל מפות": "Explore it like Google Maps",
@@ -1504,7 +1506,7 @@ $("info-btn").addEventListener("click", () => openAbout());
     });
     placeShadows();
   }
-  const BUILD = 1795808043;
+  const BUILD = 1795811291;
   setInterval(async () => {
     try {
       const v = await (await fetch("build.json?t=" + Date.now(), { cache: "no-store" })).json();
@@ -1909,6 +1911,13 @@ $("info-btn").addEventListener("click", () => openAbout());
   {
     const commons = "https://commons.wikimedia.org/wiki/";
     const photo = (name, alt, cap) => `<figure class="shot"><a href="${commons}File:${encodeURIComponent(name)}" target="_blank" rel="noopener"><img src="${commons}Special:FilePath/${encodeURIComponent(name)}?width=500" alt="${alt}" loading="lazy" onerror="this.closest('figure').remove()"></a><figcaption>${cap}</figcaption></figure>`;
+    // today against 1940 in one frame. The 1940 side is our own scene, photographed from where the 2024 camera stood
+    // (position solved from the pool and the kerb of the photograph: the cinema roof, 19.4 m up, 53 m east of the fountain)
+    const compare = (name) => `<figure class="compare"><div class="cmp" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50" aria-label="${say("השוואה בין הכיכר היום לשחזור של 1940", "The square today against the 1940 reconstruction")}">
+        <img src="${commons}Special:FilePath/${encodeURIComponent(name)}?width=960" alt="${say("הכיכר בלילה במבט מלמעלה", "The square at night, seen from above")}" loading="lazy" draggable="false" onerror="this.closest('figure').remove()">
+        <img class="then" src="../about/then_1940_night.webp" alt="${say("אותה זווית בשחזור של 1940", "The same angle in the 1940 reconstruction")}" loading="lazy" draggable="false" onerror="this.closest('figure').remove()">
+        <span class="tag now">${say("היום · 2024", "Today · 2024")}</span><span class="tag past">${say("השחזור · 1940", "Reconstruction · 1940")}</span><i aria-hidden="true"></i></div>
+      <figcaption>${say("2024. צילום: שלמה רודד, ויקישיתוף (פיקיוויקי), <bdi>CC BY 2.5</bdi>.", "2024. Photo: Shlomo Roded, Wikimedia Commons (PikiWiki), CC BY 2.5.")} <a href="${commons}File:${encodeURIComponent(name)}" target="_blank" rel="noopener">${say("לתצלום המלא", "Full photograph")} ↗</a></figcaption></figure>`;
     const era = (year, title, text, pictures) => `<h3>${year} · ${title}</h3><p>${text}</p>${pictures || ""}`;
     CARDS.levels = {
       title: say("הכיכר שעולה ויורדת", "The square that rose and fell"), by: say("הגלגולים שלה לאורך השנים", "Its changes through the years"), sub: say("מ־1934 עד היום", "From 1934 to today"),
@@ -1930,8 +1939,8 @@ $("info-btn").addEventListener("click", () => openAbout());
           photo("כיכר דיזנגוף - אתרי מורשת בתל אביב 2016 (9).jpg", say("מזרקת אגם מוארת בלילה", "Agam's fountain lit at night"), say("צולם ב־2016. צילום: Chenspec, ויקישיתוף, CC BY-SA 4.0.", "Taken in 2016. Photo: Chenspec, Wikimedia Commons, CC BY-SA 4.0.")))
         + era("2017", say("הכיכר יורדת", "The square comes down"), say("ב־2016 החליטה העירייה להחזיר את הכיכר למתכונתה המקורית. ההריסה התחילה בינואר 2017, ובנובמבר 2018 הסתיימו העבודות והפסל של אגם חזר.", "In 2016 the city decided to return the square to its original form. Demolition began in January 2017, and in November 2018 the work was finished and Agam's sculpture came back."),
           photo("PikiWiki Israel 51775 dizengoff square - period of excavations.jpg", say("הכיכר בזמן העבודות", "The square during the works"), say("2018. צילום: שאולה הייטנר, ויקישיתוף (פיקיוויקי), CC BY 2.5.", "2018. Photo: Shaula Haitner, Wikimedia Commons (PikiWiki), CC BY 2.5.")))
-        + era(say("היום", "Today"), say("שוב בגובה הרחוב", "At street level again"), say("הכיכר שוב שטוחה. התצלום נעשה מבניין קולנוע אסתר, היום מלון.", "The square is flat again. The photograph was taken from the Esther Cinema building, now a hotel."),
-          photo("115057 zina dizengoff square day and night PikiWiki Israel.jpg", say("הכיכר בלילה במבט מלמעלה", "The square at night, seen from above"), say("2024. צילום: שלמה רודד, ויקישיתוף (פיקיוויקי), CC BY 2.5.", "2024. Photo: Shlomo Roded, Wikimedia Commons (PikiWiki), CC BY 2.5."))),
+        + era(say("היום", "Today"), say("שוב בגובה הרחוב", "At street level again"), say("הכיכר שוב שטוחה. התצלום נעשה מבניין קולנוע אסתר, היום מלון. גררו את הקו כדי לראות את אותה זווית בשחזור של 1940.", "The square is flat again. The photograph was taken from the Esther Cinema building, now a hotel. Drag the line to see the same angle in the 1940 reconstruction."),
+          compare("115057 zina dizengoff square day and night PikiWiki Israel.jpg")),
       credit: say("מקורות: ויקיפדיה העברית, כיכר צינה דיזנגוף. הציטוט מעיתון הארץ לפי אתר לוטוס הזהב.", "Sources: Hebrew Wikipedia, Zina Dizengoff Square. The report from Haaretz is quoted from the Golden Lotus website."),
       links: [
         { t: say("ויקיפדיה: כיכר צינה דיזנגוף", "Hebrew Wikipedia: Zina Dizengoff Square"), u: WIKI_SQ },
@@ -1943,6 +1952,32 @@ $("info-btn").addEventListener("click", () => openAbout());
   addHotspot("levels", "person", P(12.5, D(318), 3.0), P(21.5, D(317), 1.7), P(4, D(320), 2.6));
   hotspots[hotspots.length - 1].aside = true;
 
+// ---------- dragging the line of the comparison ----------
+  {
+    const box = $("card"); let grab = null;
+    const place = (el, v) => { v = clamp(v, 0, 100); el.style.setProperty("--at", v + "%"); el.setAttribute("aria-valuenow", String(Math.round(v))); };
+    const to = (el, x) => { const r = el.getBoundingClientRect(); place(el, (x - r.left) / r.width * 100); };
+    box.addEventListener("pointerdown", (e) => {
+      const el = e.target.closest(".cmp"); if (!el) return;
+      grab = { el, x: e.clientX, y: e.clientY, on: e.pointerType === "mouse" };
+      if (grab.on) { e.preventDefault(); el.setPointerCapture(e.pointerId); to(el, e.clientX); }
+    });
+    box.addEventListener("pointermove", (e) => {
+      if (!grab) return;
+      if (!grab.on) {
+        const dx = Math.abs(e.clientX - grab.x);
+        if (dx < 6 || dx < Math.abs(e.clientY - grab.y)) return;
+        grab.on = true; grab.el.setPointerCapture(e.pointerId);
+      }
+      to(grab.el, e.clientX);
+    });
+    box.addEventListener("pointerup", (e) => { if (grab && (grab.on || Math.hypot(e.clientX - grab.x, e.clientY - grab.y) < 6)) to(grab.el, e.clientX); grab = null; });
+    box.addEventListener("pointercancel", () => { grab = null; });
+    box.addEventListener("keydown", (e) => {
+      const el = e.target.closest(".cmp"), step = { ArrowLeft: -5, ArrowRight: 5 }[e.key]; if (!el || !step) return;
+      e.preventDefault(); place(el, Number(el.getAttribute("aria-valuenow")) + step);
+    });
+  }
   // ---------- the cards in English (Zina, the levels, the cinema and "about" carry both languages in their own files) ----------
   if (LANG_EN) {
     const wiki = { t: "Hebrew Wikipedia: Zina Dizengoff Square", u: WIKI_SQ };
@@ -2874,7 +2909,8 @@ $("info-btn").addEventListener("click", () => openAbout());
   const tourMenu = (id) => ({ btn: document.querySelector('[aria-controls="' + id + '"]'), list: $(id) });
   const TOUR_STEPS = [
     { title: "ברוכים הבאים לכיכר צינה (דיזנגוף)", text: "שחזור מקורי לפי התוכניות של האדריכלית ג'ניה אוורבוך, שלפיהן נחנכה כיכר צינה ב־1938: מבנה הבניינים, הרחובות, ונקודות עניין היסטוריות מהשנים הראשונות ועד היום.", next: "בואו נתחיל", at: "welcome" },
-    { title: "מצלמות", text: "בוחרים מאיפה להסתכל: מהגג, ממבט על, מתוך הכיכר או מאחורי מכונית.", menu: "cam-menu" },
+    { title: "מצלמות", menu: "cam-menu", text: $("gyro").hidden ? "בוחרים מאיפה להסתכל: מהגג, ממבט על, מתוך הכיכר או מאחורי מכונית."
+        : "בוחרים מאיפה להסתכל. ולמטה, ״סיבוב עם הטלפון״: מזיזים את הטלפון ימינה ושמאלה, כאילו עומדים בתוך הכיכר. נקודה ירוקה: פועל. נגיעה נוספת מכבה." },
     { title: "נקודות מידע", text: "סיפורים, תצלומים וסרטים. בוחרים נושא, והמצלמה לוקחת אתכם אליו.", menu: "spot-menu" },
     { title: "הסיכות בכיכר", text: TOUR_TAP + " על סיכה, והסיפור שלה נפתח.", at: "pin" },
     { title: "לסייר בסצנה, כמו בגוגל מפות", text: TOUR_TAP + " על הקרקע, מופיע עיגול, והולכים לשם. "
@@ -2949,6 +2985,7 @@ $("info-btn").addEventListener("click", () => openAbout());
     q(".tour-skip").hidden = i === TOUR_STEPS.length - 1;
     tourDemo(step.at === "walk");
     if (step.menu) { const m = tourMenu(step.menu); m.btn.click(); m.btn.classList.add("tour-glow"); }
+    if (step.menu === "cam-menu" && !$("gyro").hidden) $("gyro").classList.add("tour-glow");     // the line the text is about
     tip.classList.remove("in"); q(".tour-ring").hidden = true;
     clearTimeout(TOUR.timer);
     TOUR.timer = setTimeout(() => { tourPlace(); tip.classList.add("in"); tip.focus({ preventScroll: true }); }, step.menu ? 300 : 60);     // after the menu has opened
@@ -2993,5 +3030,46 @@ $("info-btn").addEventListener("click", () => openAbout());
   addEventListener("resize", () => setTimeout(tourPlace, 120));
   addEventListener("keydown", (e) => { if (TOUR.el && e.key === "Escape") { e.stopPropagation(); tourEnd(); } }, true);
   $("quick-tour").addEventListener("click", () => setTimeout(tourStart, 0));   // after the menu has closed
+// ---------- background music: a loop under the scene, with one button to switch it off ----------
+  // The track is a local file (blender/preview/audio/, not in the repository until its rights are settled).
+  // Where the file is missing the button never appears. Browsers allow sound only after a touch or a key, so the
+  // music begins with the first one. It stops while a film plays in a window, and while the page is out of sight.
+  {
+    const TRACK = "../audio/ambient.m4a", btn = $("sound-btn"), card = $("card");
+    let audio = null, started = false, fade = 0, want = true;
+    try { want = localStorage.getItem("kikarSound") !== "0"; } catch (e) { /* private window: on */ }
+    const filming = () => !!card.querySelector("iframe, .film");
+    function draw() {
+      const on = started && want, label = say(on ? "השתקת המוזיקה" : "הפעלת המוזיקה", on ? "Mute the music" : "Play the music");
+      btn.setAttribute("aria-pressed", String(on)); btn.setAttribute("aria-label", label); btn.title = label;
+    }
+    function apply() {                                       // what should be heard right now
+      if (!audio) return;
+      clearInterval(fade);
+      if (!(started && want) || filming() || document.hidden) { audio.pause(); return; }
+      if (!audio.paused) { audio.volume = 1; return; }
+      audio.volume = 0;                                      // comes in softly (iPhones ignore volume: the file itself is quiet)
+      audio.play().then(() => { fade = setInterval(() => { audio.volume = Math.min(1, audio.volume + .08); if (audio.volume >= 1) clearInterval(fade); }, 80); })
+        .catch(() => { started = false; draw(); });          // not allowed yet: the next touch tries again
+    }
+    const first = (e) => {
+      if (!audio || started || !want || (e.target.closest && e.target.closest("#sound-btn"))) return;
+      started = true; draw(); apply();
+    };
+    ["click", "touchend", "keydown"].forEach((n) => addEventListener(n, first, true));
+    btn.addEventListener("click", () => {
+      want = !(started && want); started = true;
+      try { localStorage.setItem("kikarSound", want ? "1" : "0"); } catch (e) { /* private window: for this visit only */ }
+      draw(); apply();
+    });
+    // a film opened in the window silences the music; closing the window brings it back
+    new MutationObserver(apply).observe(card, { childList: true, subtree: true });
+    document.addEventListener("visibilitychange", apply);
+    fetch(TRACK, { method: "HEAD" }).then((r) => {
+      if (!r.ok) return;
+      audio = new Audio(); audio.preload = "none"; audio.loop = true; audio.src = TRACK;
+      btn.hidden = false; draw();
+    }).catch(() => { /* offline: no music */ });
+  }
 requestAnimationFrame(frame);
 })();

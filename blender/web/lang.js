@@ -34,6 +34,8 @@
     "שחזור מקורי לפי התוכניות של האדריכלית ג'ניה אוורבוך, שלפיהן נחנכה כיכר צינה ב־1938: מבנה הבניינים, הרחובות, ונקודות עניין היסטוריות מהשנים הראשונות ועד היום.":
       "An original reconstruction after the plans of architect Genia Averbuch, by which the square opened in 1938: the buildings, the streets, and points of history from its first years to today.",
     "בוחרים מאיפה להסתכל: מהגג, ממבט על, מתוך הכיכר או מאחורי מכונית.": "Choose where to look from: a rooftop, bird's eye, inside the square or behind a car.",
+    "בוחרים מאיפה להסתכל. ולמטה, ״סיבוב עם הטלפון״: מזיזים את הטלפון ימינה ושמאלה, כאילו עומדים בתוך הכיכר. נקודה ירוקה: פועל. נגיעה נוספת מכבה.":
+      "Pick a view. At the bottom, Turn with phone: swing your phone to look around as if you were there. Green dot: on. Tap again for off.",
     "סיפורים, תצלומים וסרטים. בוחרים נושא, והמצלמה לוקחת אתכם אליו.": "Stories, photographs and films. Pick one and the camera takes you there.",
     "הסיכות בכיכר": "Pins in the square", "נוגעים על סיכה, והסיפור שלה נפתח.": "Tap a pin to open its story.", "לוחצים על סיכה, והסיפור שלה נפתח.": "Click a pin to open its story.",
     "לסייר בסצנה, כמו בגוגל מפות": "Explore it like Google Maps",
