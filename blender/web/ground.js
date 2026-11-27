@@ -5,12 +5,12 @@
   });
   const roadNames = [["דיזנגוף", 348], ["ריינס", 43], ["זמנהוף", 98], ["דיזנגוף", 168], ["פינסקר", 225], ["בן עמי", 299]].map(([name, deg]) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(8.4, 4.6).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ map: roadName(name), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+      new THREE.MeshBasicMaterial({ map: roadName(tr(name)), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
     m.position.copy(P(54, D(deg), .06)); m.rotation.y = -D(deg);       // upright for someone looking out from the square
     scene.add(m); return [m, name];
   });
   // a canvas may be drawn before the title font arrives: draw again when it has
-  if (document.fonts) document.fonts.load('400 100px "Secular One"', "אבג").then(() => roadNames.forEach(([m, name]) => { m.material.map = roadName(name); m.material.needsUpdate = true; })).catch(() => {});
+  if (document.fonts) document.fonts.load('400 100px "Secular One"', "אבג").then(() => roadNames.forEach(([m, name]) => { m.material.map = roadName(tr(name)); m.material.needsUpdate = true; })).catch(() => {});
   const blipGeo = new THREE.RingGeometry(.32, .355, 40).rotateX(-Math.PI / 2);
   function radar(now) {
     scene.children.forEach((o, i) => {

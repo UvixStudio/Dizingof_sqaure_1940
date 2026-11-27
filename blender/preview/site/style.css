@@ -159,6 +159,7 @@ body:has(.drop-btn[aria-expanded="true"]) .gesture, body:has(.quick-btn[aria-exp
 .quick-list button { display: flex; animation: quick-in .22s cubic-bezier(.2,.8,.3,1) backwards; }
 .quick-list button:nth-last-child(2) { animation-delay: .045s; }
 .quick-list button:nth-last-child(3) { animation-delay: .09s; }
+.quick-list button:nth-last-child(4) { animation-delay: .135s; }
 .quick-list i { width: 48px; height: 48px; font-style: normal; }
 .quick-list svg { width: 21px; height: 21px; stroke-width: 1.8; }
 #quick-night .sun, #quick-night[aria-checked="true"] .moon { display: none; }
@@ -172,7 +173,8 @@ body:has(.drop-btn[aria-expanded="true"]) .gesture, body:has(.quick-btn[aria-exp
 @keyframes quick-in { from { opacity: 0; transform: translateY(12px) scale(.9); } }
 @media (min-width: 640px) { .quick { right: 20px; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); } .quick .quick-btn { width: 64px; height: 64px; } .quick .quick-btn::after { inset: 6px; } .quick-btn svg { width: 28px; height: 28px; } .quick-list { padding-right: 8px; } }
 @media not all and (min-width: 800px) and (min-height: 560px) { body:has(#card:not([hidden])) .quick { display: none; } }
-@media (max-width: 639px) { .hint { max-width: calc(100% - 132px); } }
+@media (max-width: 639px) { .hint { max-width: calc(100% - 132px); }
+  body:has(.drop-btn[aria-expanded="true"]) .quick { opacity: 0; visibility: hidden; } }     /* an open menu needs that corner */
 @media (prefers-reduced-motion: reduce) { .quick-list button { animation: none; } .quick-btn svg { transition: none; } }
 
 /* language: one plain word at the top left */
@@ -195,7 +197,65 @@ body.night .lang-btn { color: #fff; text-shadow: 0 0 8px rgba(0,0,0,.65); }     
 /* during the opening only the title is there; the rest arrives with the square (web/intro.js) */
 .bar, .quick, .lang-btn { transition: opacity .6s ease; }
 body.intro .bar, body.intro .quick, body.intro .lang-btn, body.intro .gesture, body.intro .hint { opacity: 0 !important; visibility: hidden; pointer-events: none; }
-.skip { position: fixed; z-index: 8; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); transform: translateX(-50%); margin: 0; font: 500 .85rem/1 var(--body); color: var(--blue); opacity: .65; pointer-events: none; white-space: nowrap; }
+.skip { position: fixed; z-index: 8; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); transform: translateX(-50%); display: flex; align-items: center; gap: 2px; min-height: 38px; padding: 0 12px 0 16px;
+  border: 1px solid rgba(29,42,90,.22); border-radius: 999px; background: rgba(255,255,255,.55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: var(--blue); font: 600 .84rem/1 var(--body); cursor: pointer; }
+.skip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.skip::after { content: ""; position: absolute; inset: -6px; }     /* easy to hit though it looks small */
+@media (hover: hover) { .skip:hover { background: rgba(255,255,255,.9); } }
+.skip:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+
+/* the first visit tour (web/tour.js): blue tips that point at what they talk about */
+.tour-veil { position: fixed; inset: 0; z-index: 20; }                      /* the scene waits meanwhile */
+.tour-tip { position: fixed; z-index: 22; box-sizing: border-box; width: min(268px, calc(100vw - 24px)); padding: 14px 16px 10px; direction: rtl; text-align: right; font-family: var(--body); color: #fff; background: rgba(23,34,72,.95);
+  border: 1px solid rgba(255,255,255,.34); border-radius: 16px; box-shadow: 0 10px 34px rgba(8,12,30,.4); opacity: 0; transform: translateY(6px); transition: opacity .22s ease, transform .22s cubic-bezier(.2,.8,.3,1); }
+.tour-tip.in { opacity: 1; transform: none; }
+.tour-tip:focus { outline: none; }                       /* the ring is for the buttons, and only when a keyboard reaches them */
+.tour-tip h3 { margin: 0 0 5px; font-size: 1.02rem; line-height: 1.3; color: #f3dfa8; }
+.tour-tip p { margin: 0; font-size: .9rem; line-height: 1.5; color: rgba(255,255,255,.92); }
+.tour-tip footer { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+.tour-count { margin-left: auto; font-size: .76rem; color: rgba(255,255,255,.6); }
+.tour-tip button { min-height: 40px; border: 0; cursor: pointer; font: 600 .86rem/1 var(--body); }
+.tour-skip { padding: 0 10px; background: none; color: rgba(255,255,255,.72); }
+.tour-next { padding: 0 10px; background: none; color: #f3dfa8; font-weight: 700; }
+.tour-tip button:focus-visible { outline: 2px solid #f3dfa8; outline-offset: 2px; }
+.tour-finger { position: fixed; z-index: 21; width: 0; height: 0; pointer-events: none; transition: left .55s cubic-bezier(.3,.7,.3,1), top .55s cubic-bezier(.3,.7,.3,1); }
+.tour-finger svg { position: absolute; left: -13px; top: -3px; width: 44px; height: 44px; fill: #fff; stroke: var(--blue); stroke-width: 1.300; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 3px 6px rgba(8,12,30,.45));
+  transform: translate(8px, 14px); transition: transform .18s ease; }
+.tour-finger.down svg { transform: translate(0, 0) scale(.9); }
+.tour-finger::after { content: ""; position: absolute; left: -24px; top: -24px; width: 48px; height: 48px; box-sizing: border-box; border: 3px solid #fff; border-radius: 50%; opacity: 0; }
+.tour-finger.down::after { animation: tour-ripple .8s ease-out; }
+@keyframes tour-ripple { from { opacity: .95; transform: scale(.25); } to { opacity: 0; transform: scale(1.5); } }
+.tour-tip[data-arrow="down"]::after, .tour-tip[data-arrow="right"]::after { content: ""; position: absolute; width: 13px; height: 13px; background: rgba(23,34,72,.95); border: solid rgba(255,255,255,.34); transform: rotate(45deg); }
+.tour-tip[data-arrow="down"]::after { left: calc(var(--at) - 7px); bottom: -8px; border-width: 0 1px 1px 0; }
+.tour-tip[data-arrow="right"]::after { right: -8px; top: calc(var(--at) - 7px); border-width: 1px 1px 0 0; }
+.tour-ring { position: fixed; z-index: 21; width: 54px; height: 54px; margin: -27px 0 0 -27px; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 0 0 4px rgba(23,34,72,.55); pointer-events: none; animation: tour-pulse 1.5s ease-in-out infinite; }
+.tour-glow { border-radius: 14px; animation: tour-pulse-box 1.5s ease-in-out infinite; }
+.quick-btn.tour-glow { border-radius: 50%; }
+@keyframes tour-pulse { 50% { transform: scale(1.14); } }
+@keyframes tour-pulse-box { 0%, 100% { box-shadow: 0 0 0 2px #fff, 0 0 0 5px rgba(23,34,72,.55); } 50% { box-shadow: 0 0 0 3px #fff, 0 0 0 9px rgba(23,34,72,.3); } }
+body.touring .gesture, body.touring .hint { opacity: 0 !important; visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { .tour-tip, .tour-finger, .tour-finger svg { transition: none; } .tour-ring, .tour-glow, .tour-finger.down::after { animation: none; } }
+
+/* English reads left to right: the same layout, mirrored where direction carries meaning */
+html[dir="ltr"] .quick, html[dir="ltr"] .quick-list { justify-items: end; }
+html[dir="ltr"] .lang-btn { left: auto; right: 10px; }
+@media (max-width: 639px) { html[dir="ltr"] .title h1 { font-size: min(1.15rem, 4.7vw); padding-inline: 12px; } }   /* the English name is long: room for the language button */
+@media (min-width: 640px) { html[dir="ltr"] .lang-btn { right: 22px; } }
+html[dir="ltr"] .bar .drop-btn[aria-expanded="false"] .chev { transform: scaleX(-1); }
+html[dir="ltr"] .skip { padding: 0 12px 0 16px; }
+html[dir="ltr"] .skip svg { transform: scaleX(-1); }
+html[dir="ltr"] .tour-tip { direction: ltr; text-align: left; }
+html[dir="ltr"] .tour-count { margin-left: 0; margin-right: auto; }
+html[dir="ltr"] .tour-next span { display: inline-block; transform: scaleX(-1); }
+.card[dir="ltr"] > * { direction: ltr; }
+.card[dir="ltr"] > .scroll { direction: rtl; }                              /* keeps the scroll bar on the outer side */
+.card[dir="ltr"] .scroll > * { direction: ltr; }
+.card[dir="ltr"] .head { padding: 0 24px 10px 10px; }
+.card[dir="ltr"] .x { left: auto; right: -18px; }
+.card[dir="ltr"] figure.beside { float: left; margin: 4px 14px 8px 0; }
+.card[dir="ltr"] .films bdi { text-align: left; }
+.card[dir="ltr"] .rights ul { padding: 0 0 0 18px; }
+.card[dir="ltr"] .film .cap { font-size: 4.7cqw; }                          /* the English lines run longer */
 
 /* the invitation to share, at the end of "about" */
 .card .share-end { margin: 18px 0 6px; padding: 14px 12px 16px; border: 1px solid var(--gold); border-radius: 12px; text-align: center; }

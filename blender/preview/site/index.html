@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>כיכר דיזנגוף 1940</title>
-<meta name="description" content="שחזור תלת־ממדי מסוגנן של כיכר דיזנגוף בתל אביב ב־1940, לצפייה בטלפון.">
+<title>כיכר צינה (דיזנגוף) 1940</title>
+<meta name="description" content="שחזור תלת־ממדי מסוגנן של כיכר צינה (דיזנגוף) בתל אביב ב־1940, לצפייה בטלפון.">
 <meta property="og:type" content="website">
 <meta property="og:locale" content="he_IL">
-<meta property="og:title" content="כיכר דיזנגוף 1940">
-<meta property="og:description" content="שחזור תלת־ממדי מסוגנן של כיכר דיזנגוף בתל אביב ב־1940. סיבוב בכיכר, שלטי רחוב ונקודות מידע היסטוריות.">
+<meta property="og:title" content="כיכר צינה (דיזנגוף) 1940">
+<meta property="og:description" content="שחזור תלת־ממדי מסוגנן של כיכר צינה (דיזנגוף) בתל אביב ב־1940. סיבוב בכיכר, שלטי רחוב ונקודות מידע היסטוריות.">
 <meta property="og:url" content="https://dizingof-sqaure-1940.vercel.app/src/">
 <meta property="og:image" content="https://dizingof-sqaure-1940.vercel.app/assets/og.jpg?v=2">
 <meta property="og:image:width" content="1200">
@@ -16,7 +16,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://dizingof-sqaure-1940.vercel.app/assets/og.jpg?v=2">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@400;600;700&family=Heebo:wght@400;500;700&family=Secular+One&display=swap">
-<link rel="stylesheet" href="style.css?v=1795801014">
+<link rel="stylesheet" href="style.css?v=1795808043">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/fontawesome.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/brands.min.css">
 <link rel="preload" as="fetch" crossorigin href="../kikar_web.glb.gz?t=1795781363">
@@ -24,18 +24,18 @@
 <body>
 <div dir="rtl">
   <div class="loading" id="loading" role="status">
-    <div class="plate">כיכר צינה דיזנגוף<small>שחזור תלת־ממד 1940</small></div>
+    <div class="plate">כיכר צינה (דיזנגוף)<small>שחזור תלת־ממד 1940</small></div>
     <div class="load-track"><i id="load-bar"></i></div>
     <p><span id="load-text">טוענים את הכיכר</span> <span id="load-pct" dir="ltr">0%</span></p>
     <button class="pill" id="load-again" hidden>לנסות שוב</button>
   </div>
-  <canvas id="gl" aria-label="סקיצה תלת־ממדית של כיכר דיזנגוף ב־1940"></canvas>
+  <canvas id="gl" aria-label="סקיצה תלת־ממדית של כיכר צינה (דיזנגוף) ב־1940"></canvas>
   <canvas id="grain" aria-hidden="true"></canvas>
   <div class="vig" aria-hidden="true"></div>
 
   <header class="top">
     <div class="title">
-      <h1 id="home" role="button" tabindex="0" title="חזרה למבט הפתיחה">כיכר צינה דיזנגוף<small>שחזור תלת־ממד 1940</small></h1>
+      <h1 id="home" role="button" tabindex="0" title="חזרה למבט הפתיחה">כיכר צינה (דיזנגוף)<small>שחזור תלת־ממד 1940</small></h1>
     </div>
   </header>
 
@@ -93,6 +93,7 @@
       <button role="menuitem" id="info-btn" aria-haspopup="dialog" aria-label="אודות" title="אודות"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10.500v8M12 5.500v.100" stroke-width="3.2"/></svg></i></button>
       <button role="menuitem" id="quick-share" aria-label="שיתוף" title="שיתוף"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="17.500" cy="5.500" r="2.800"/><circle cx="6.500" cy="12" r="2.800"/><circle cx="17.500" cy="18.500" r="2.800"/><path d="M9 10.600l6-3.600M9 13.400l6 3.600"/></svg></i></button>
       <button role="menuitemcheckbox" aria-checked="false" id="quick-night" data-keep aria-label="מוד לילה" title="מוד לילה"><i><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.500A8.500 8.500 0 0 1 9.500 4a8.500 8.500 0 1 0 10.500 10.500z"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.200"/><path d="M12 2.500v2.500M12 19v2.500M2.500 12H5M19 12h2.500M5.300 5.300l1.800 1.800M16.900 16.900l1.800 1.800M5.300 18.700l1.800-1.800M16.900 7.100l1.800-1.800"/></svg></i></button>
+      <button role="menuitem" id="quick-tour" aria-label="סיור היכרות" title="סיור היכרות"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.500" cy="18.500" r="2.200"/><circle cx="18.500" cy="5.500" r="2.200"/><path d="M7.700 18.500h8.800a3.250 3.250 0 0 0 0-6.500h-9a3.250 3.250 0 0 1 0-6.500h8.800"/></svg></i></button>
     </div>
     <button class="quick-btn" id="quick-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="quick-list" aria-label="תפריט: אודות, שיתוף, יום ולילה" title="תפריט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
   </div>
@@ -102,6 +103,6 @@
 
 <script src="../lib/three.min.js"></script>
 <script src="../lib/GLTFLoader.js"></script>
-<script src="scene.js?v=1795801014"></script>
+<script src="scene.js?v=1795808043"></script>
 </body>
 </html>

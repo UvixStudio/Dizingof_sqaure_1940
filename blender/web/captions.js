@@ -2,6 +2,12 @@
   // The film is silent about its own words on YouTube, so the site lays one line at a time over the player
   // (text: data/dizengoff_opening_he_fixed.srt, put in by make_site.py). YouTube's own captions stay off.
   const CAPTIONS = __CAPTIONS__;
+  const CAPTIONS_EN = [                                                // the same lines and times, translated
+    "Zina Dizengoff Square,", "opened this week before a large crowd,", "was handed to the public of Tel Aviv,", "laid out",
+    "in beauty and splendour.", "Among carpets of grass and beds", "of flowers, date palms were planted too,", "brought from Gan Rachel",
+    "in Kinneret. 28 white benches,", "a handsome water fountain", "and handsome lamps, lit every evening,", "will serve the public", "for its rest."
+  ];
+  if (LANG_EN && CAPTIONS_EN.length === CAPTIONS.length) CAPTIONS.forEach((c, i) => { c[2] = CAPTIONS_EN[i]; });
   let youtube = null;
   const youtubeApi = () => youtube || (youtube = new Promise((ok, no) => {
     if (window.YT && window.YT.Player) return ok();

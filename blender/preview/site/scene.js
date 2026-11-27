@@ -1,5 +1,100 @@
 (() => {
   const $ = (id) => document.getElementById(id);
+  // ---------- Hebrew or English (?lang=en, the button, remembered on the device) ----------
+  // The site is written in Hebrew. In English every text on the page is swapped as it appears, by the exact Hebrew
+  // string; what is painted in the scene goes through tr(). The street-name signs carry both languages anyway.
+  const LANG_EN = (() => {
+    let l = (location.search.match(/[?&]lang=(en|he)\b/) || [])[1];
+    try { if (l) localStorage.setItem("kikarLang", l); else l = localStorage.getItem("kikarLang"); } catch (e) { /* private window */ }
+    return l === "en";
+  })();
+  const EN_TEXT = {
+    // title and loading
+    "כיכר צינה (דיזנגוף)": "Zina Square (Dizengoff)", "שחזור תלת־ממד 1940": "3D reconstruction, 1940",
+    "טוענים את הכיכר": "Loading the square", "מרכיבים את הכיכר": "Putting the square together", "מדליקים את האור": "Switching on the lights",
+    "לנסות שוב": "Try again", "הטעינה נכשלה. בדקו את החיבור.": "Loading failed. Check your connection.",
+    // the bar and its menus
+    "מהגג": "Rooftop", "בתוך הכיכר": "In the square", "מהמדרכה": "Sidewalk", "מבט על": "Bird's eye", "מאחורי מכונית": "Behind a car", "מבט חופשי": "Free view",
+    "סיבוב עם הטלפון": "Turn with phone", "יישור לצפון": "Align north", "נקודות מידע": "Stories",
+    "חנוכת הכיכר 1938": "The 1938 opening", "צינה דיזנגוף": "Zina Dizengoff", "הכיכר עולה ויורדת": "Up and down again", "ג'ניה אוורבוך": "Genia Averbuch", "קולנוע כיכר דיזנגוף": "Dizengoff Square Cinema",
+    "שליטה": "Controls", "בחירת מצלמה": "Choose a camera", "מצלמות": "Cameras", "גרירה מסובבת את הסצנה": "Drag to look around",
+    "סקיצה תלת־ממדית של כיכר צינה (דיזנגוף) ב־1940": "A 3D sketch of Zina Square (Dizengoff) in 1940", "חזרה למבט הפתיחה": "Back to the opening view",
+    "סגירה": "Close", "סגירת החלון": "Close", "נגן את הסרטון": "Play the video",
+    // the round button
+    "אודות": "About", "שיתוף": "Share", "מוד לילה": "Night", "אור יום": "Daylight", "סיור היכרות": "Quick tour", "תפריט": "Menu", "תפריט: אודות, שיתוף, יום ולילה": "Menu: about, share, day and night",
+    // passing hints
+    "גרור כדי להסתובב. צביטה לזום.": "Drag to look around. Pinch to zoom.", "גרור כדי להקיף את הכיכר. צביטה לקרב ולהרחיק.": "Drag to circle the square. Pinch to zoom.",
+    "נוסעים סביב הכיכר. גרור כדי להסתכל מסביב לרכב, צביטה לקרב ולהרחיק.": "Riding round the square. Drag to look around the car, pinch to zoom.",
+    "החיישנים לא זמינים כאן. בטלפון, פתח את הקובץ מכתובת https.": "Motion sensors are not available here. On a phone, open an https address.",
+    "אין הרשאה לחיישנים. גרור כדי להסתובב.": "No permission for motion sensors. Drag to look around.",
+    "הסצנה מכוונת לצפון לפי המצפן. גרירה מסובבת אותה אם צריך.": "The scene follows your compass. Drag if it needs turning.",
+    "כוון את הטלפון לצפון ובחר ׳יישור לצפון׳ בתפריט המצלמות.": "Point the phone north and choose Align north in the cameras menu.",
+    "הקישור הועתק": "Link copied", "העתיקו את הקישור משורת הכתובת": "Copy the link from the address bar",
+    // the opening and the tour
+    "דלג": "Skip", "הבא": "Next", "סיום": "Done", "בואו נתחיל": "Let's start",
+    "ברוכים הבאים לכיכר צינה (דיזנגוף)": "Welcome to Zina Square (Dizengoff)",
+    "שחזור מקורי לפי התוכניות של האדריכלית ג'ניה אוורבוך, שלפיהן נחנכה כיכר צינה ב־1938: מבנה הבניינים, הרחובות, ונקודות עניין היסטוריות מהשנים הראשונות ועד היום.":
+      "An original reconstruction after the plans of architect Genia Averbuch, by which the square opened in 1938: the buildings, the streets, and points of history from its first years to today.",
+    "בוחרים מאיפה להסתכל: מהגג, ממבט על, מתוך הכיכר או מאחורי מכונית.": "Choose where to look from: a rooftop, bird's eye, inside the square or behind a car.",
+    "סיפורים, תצלומים וסרטים. בוחרים נושא, והמצלמה לוקחת אתכם אליו.": "Stories, photographs and films. Pick one and the camera takes you there.",
+    "הסיכות בכיכר": "Pins in the square", "נוגעים על סיכה, והסיפור שלה נפתח.": "Tap a pin to open its story.", "לוחצים על סיכה, והסיפור שלה נפתח.": "Click a pin to open its story.",
+    "לסייר בסצנה, כמו בגוגל מפות": "Explore it like Google Maps",
+    "נוגעים על הקרקע, מופיע עיגול, והולכים לשם. גוררים כדי להסתכל סביב, וצובטים לזום.": "Tap the ground, a circle appears, and you walk there. Drag to look around, pinch to zoom.",
+    "לוחצים על הקרקע, מופיע עיגול, והולכים לשם. גוררים כדי להסתכל סביב, וגלגלת לזום.": "Click the ground, a circle appears, and you walk there. Drag to look around, scroll to zoom.",
+    "ועוד": "And more", "אודות, שיתוף, יום ולילה, והסיור הזה שוב.": "About, share, day and night, and this tour again.",
+    // what is exact and what is estimated (the list in the page, shown again inside "about")
+    "גרסת עבודה: המודל נבנה בבלנדר לפי תצלומים מ־1938-1940 ועדיין בתהליך.":
+      "Work in progress: the model is built in Blender from photographs of 1938 to 1940 and is still being worked on.",
+    "צורות הבניינים וכיווני הרחובות מ־OpenStreetMap, © תורמי OpenStreetMap. הדגם כולל גם מבנים שהושלמו אחרי 1940, כמו מלון גזית (1948).":
+      "Building shapes and street directions come from OpenStreetMap, © OpenStreetMap contributors. The model also includes buildings finished after 1940, such as the Gazit Hotel (1948).",
+    "קולנוע אסתר הותאם לתצלומים. החזיתות של שאר הבניינים, הצבעים והרכבים הם פרשנות.":
+      "The Esther Cinema was matched to photographs. The fronts of the other buildings, the colours and the cars are interpretation.",
+    "טבעות הגן, הכביש והמזרקה נמדדו מתצלומים, בדיוק משוער.":
+      "The garden rings, the road and the fountain were measured from photographs, with approximate accuracy.",
+    "שמות הבתים, שנותיהם והאדריכלים לפי ויקיפדיה. השיוך של בתי פלדמן, גרינמן ומירנברג לגוש מסוים בטבעת הוא השערה.":
+      "House names, dates and architects follow Wikipedia. Placing the Feldman, Greenman and Mirenberg houses on particular blocks of the ring is a guess.",
+    "שמות אקמן, קפה אמנות, בית מרקחת וגל-אור לקוחים מתצלומים ומוויקיפדיה. שלמן, ויטמן, פיינשטוק והספר הטוב היו עסקים בתל אביב, לא בהכרח בכיכר. שאר שמות החנויות הומצאו ברוח התקופה. חזיתות החנויות, מיקומן, צבעי הסככות והכרזה הגדולה הם שחזור.":
+      "The names Ackerman, Café Omanut, the pharmacy and Gal-Or are taken from photographs and Wikipedia. Shalman, Witman, Feinstock and Ha-Sefer Ha-Tov were businesses in Tel Aviv, not necessarily in the square. The other shop names were invented in the spirit of the time. The shopfronts, their positions, the awning colours and the large poster are reconstruction.",
+    "נקודות המידע (העיגולים החומים) מבוססות על ויקיפדיה ועל המקורות שמצוינים בכל כרטיס.":
+      "The points of information (the brown circles) are based on Wikipedia and on the sources named in each card.",
+    // painted in the scene: building names and the street names on the road
+    "לימים קולנוע אסתר": "later the Esther Cinema", "בתי פלדמן וגרינמן": "Feldman and Greenman Houses", "לילנפלד וביז'ונסקי · 1935-36": "Lilienfeld and Bizhonsky · 1935-36",
+    "בית מירנברג": "Mirenberg House", "תכנון: ג'ניה אוורבוך · 1936": "Design: Genia Averbuch · 1936",
+    "דיזנגוף": "DIZENGOFF", "ריינס": "REINES", "זמנהוף": "ZAMENHOF", "בן עמי": "BEN AMI", "פינסקר": "PINSKER",
+  };
+  const tr = (s) => LANG_EN && EN_TEXT[s] !== undefined ? EN_TEXT[s] : s;
+  const say = (he, en) => LANG_EN ? en : he;                  // for the long texts, written side by side where they are used
+  function switchLang() {                                    // the page loads again in the other language, without the opening
+    const url = new URL(location.href);
+    url.searchParams.set("lang", LANG_EN ? "he" : "en");
+    try { sessionStorage.setItem("kikarQuiet", "1"); } catch (e) { /* the opening will simply play again */ }
+    location.replace(url);
+  }
+  if (LANG_EN) {
+    const html = document.documentElement;
+    html.lang = "en"; html.dir = "ltr"; document.title = "Zina Square (Dizengoff) 1940";
+    document.querySelectorAll("body > div[dir]").forEach((d) => { d.dir = "ltr"; });     // the page's right-to-left wrapper
+    const swap = (s) => {
+      const key = s.trim(), count = key.match(/^(\d+) מתוך (\d+)$/);
+      if (count) return count[1] + " of " + count[2];
+      return EN_TEXT[key] !== undefined ? s.replace(key, EN_TEXT[key]) : s;
+    };
+    const attrs = ["aria-label", "title", "alt"];
+    const words = (node) => {
+      if (node.nodeType === 3) { const s = swap(node.nodeValue); if (s !== node.nodeValue) node.nodeValue = s; return; }
+      if (node.nodeType !== 1 || node.id === "lang-btn" || /^(SCRIPT|STYLE)$/.test(node.nodeName)) return;
+      attrs.forEach((a) => { const v = node.getAttribute(a); if (v) { const s = swap(v); if (s !== v) node.setAttribute(a, s); } });
+      node.childNodes.forEach(words);
+    };
+    const button = $("lang-btn");                           // the button offers the way back, in Hebrew
+    button.innerHTML = '<span class="long">עברית</span><span class="short">עב</span>'; button.lang = "he"; button.setAttribute("aria-label", "עברית"); button.dir = "rtl";
+    words(document.body);
+    new MutationObserver((list) => list.forEach((m) => { if (m.type === "childList") m.addedNodes.forEach(words); else words(m.target); }))
+      .observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: attrs });
+    const card = $("card");                                  // a card not yet translated keeps reading right to left
+    new MutationObserver(() => { const h = card.querySelector("h2"); if (h) card.dir = /[א-ת]/.test(h.textContent) ? "rtl" : "ltr"; }).observe(card, { childList: true });
+  }
+
   const D = THREE.MathUtils.degToRad;
 
   // ---------- palette (watercolour washes) ----------
@@ -171,7 +266,7 @@
   function label(text, pos, size = 3.2) {
     const c = document.createElement("canvas"); c.width = 512; c.height = 128;
     const x = c.getContext("2d"); x.font = "600 64px Assistant, Arial, sans-serif"; x.fillStyle = "#2b2925";
-    x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; x.fillText(text, 256, 64);
+    x.textAlign = "center"; x.textBaseline = "middle"; x.direction = LANG_EN ? "ltr" : "rtl"; x.fillText(text, 256, 64);
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false, fog: true }));
     s.position.copy(pos); s.scale.set(size * 4, size, 1); scene.add(s);
   }
@@ -274,7 +369,7 @@
     mesh(road, C.asphalt, g, { sketchy: false, mat: inkC });
     for (let d = FACADE + 8; d < 200; d += 14) for (const sd of [-1, 1]) youngTree(g, sd * (a.gap - 1.2), -d, .6);
     const gl = new THREE.Mesh(new THREE.PlaneGeometry(26, 8).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ map: groundTex(a.name), transparent: true, opacity: .5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+      new THREE.MeshBasicMaterial({ map: groundTex(tr(a.name)), transparent: true, opacity: .5, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
     gl.position.set(0, .16, -(ROAD_OUT + 24)); g.add(gl); scene.attach(gl); gl.userData.keep = true;
     addSign(a);
   });
@@ -805,7 +900,7 @@
       e.preventDefault(); all[(to + all.length) % all.length].focus({ preventScroll: true });
     });
   });
-  addEventListener("pointerdown", (e) => { if (!e.target.closest(".drop, .quick")) closeMenus(); }, true);
+  addEventListener("pointerdown", (e) => { if (!e.target.closest(".drop, .quick, .tour")) closeMenus(); }, true);
   const hintEl = $("hint"); let hintTimer = 0, hintSaid = "";
   // "how to look around" is a small moving hand (or mouse), shown until the first drag or zoom. Other messages are text
   const LOOKING = new Set([HINT, HINT_TOP, HINT_RIDE]);
@@ -821,7 +916,7 @@
   }
   canvas.addEventListener("pointermove", () => { if (!gestureDone && (ptrs.size > 1 || (ptrs.size && tap && tap.moved > 8))) endGesture(); });
   canvas.addEventListener("wheel", endGesture, { passive: true });
-  $("lang-btn").addEventListener("click", () => { hintEl.textContent = "הגרסה באנגלית בדרך"; showHint(); });
+  $("lang-btn").addEventListener("click", switchLang);        // web/lang.js
   // day / night (web/night.js): the icon shows where a press will lead
   $("quick-night").addEventListener("click", (e) => {
     const b = e.currentTarget, night = b.getAttribute("aria-checked") !== "true";
@@ -1151,6 +1246,7 @@ $("info-btn").addEventListener("click", () => openAbout());
       h.sp.scale.set(s, s, 1); h.ring.visible = false; h.sp.visible = !(h.aside && d < 5); h.ring.scale.set(s * (1 + ph * .9), s * (1 + ph * .9), 1); h.ring.material.opacity = reduce ? .5 : .75 * (1 - ph);
     });
     introShow();
+    carLights();
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
@@ -1196,7 +1292,7 @@ $("info-btn").addEventListener("click", () => openAbout());
     renderer.compile(scene, camera); await painted(); await painted();
     progress(1); shown = true;
     veilLoad.classList.add("done"); introStart();
-    setTimeout(() => { veilLoad.hidden = true; if (!introOn) showHint(); }, 700);
+    setTimeout(() => { veilLoad.hidden = true; if (!introOn && !tourMaybe()) showHint(); }, 700);
   }
   function loadFailed(e) {
     console.error(e);
@@ -1318,7 +1414,7 @@ $("info-btn").addEventListener("click", () => openAbout());
     list.forEach((b) => {
       const y = b.top + 3.6, W = 6.4, H = 2.29, x = b.x, z = -b.y;
       const s = new THREE.Group(); s.position.set(x - b.nx * 6, y, z + b.ny * 6); scene.add(s); s.userData.keep = true;   // over the middle of the block
-      const m = new THREE.MeshBasicMaterial({ map: labelTex(...LABELS[b.key]), transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
+      const m = new THREE.MeshBasicMaterial({ map: labelTex(...LABELS[b.key].map(tr)), transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
       s.userData.m = m; s.add(new THREE.Mesh(new THREE.PlaneGeometry(W, H), m));
       signs.push(s);
       if (b.key === "B") {
@@ -1408,7 +1504,7 @@ $("info-btn").addEventListener("click", () => openAbout());
     });
     placeShadows();
   }
-  const BUILD = 1795801014;
+  const BUILD = 1795808043;
   setInterval(async () => {
     try {
       const v = await (await fetch("build.json?t=" + Date.now(), { cache: "no-store" })).json();
@@ -1656,12 +1752,12 @@ $("info-btn").addEventListener("click", () => openAbout());
   });
   const roadNames = [["דיזנגוף", 348], ["ריינס", 43], ["זמנהוף", 98], ["דיזנגוף", 168], ["פינסקר", 225], ["בן עמי", 299]].map(([name, deg]) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(8.4, 4.6).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ map: roadName(name), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+      new THREE.MeshBasicMaterial({ map: roadName(tr(name)), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
     m.position.copy(P(54, D(deg), .06)); m.rotation.y = -D(deg);       // upright for someone looking out from the square
     scene.add(m); return [m, name];
   });
   // a canvas may be drawn before the title font arrives: draw again when it has
-  if (document.fonts) document.fonts.load('400 100px "Secular One"', "אבג").then(() => roadNames.forEach(([m, name]) => { m.material.map = roadName(name); m.material.needsUpdate = true; })).catch(() => {});
+  if (document.fonts) document.fonts.load('400 100px "Secular One"', "אבג").then(() => roadNames.forEach(([m, name]) => { m.material.map = roadName(tr(name)); m.material.needsUpdate = true; })).catch(() => {});
   const blipGeo = new THREE.RingGeometry(.32, .355, 40).rotateX(-Math.PI / 2);
   function radar(now) {
     scene.children.forEach((o, i) => {
@@ -1790,15 +1886,15 @@ $("info-btn").addEventListener("click", () => openAbout());
     const file = "https://commons.wikimedia.org/wiki/", name = "ZinaDizenghof22.jpg";
     const p = (t) => `<p>${esc(t)}</p>`;
     CARDS.zina = {
-      title: "צינה דיזנגוף", by: "האישה שעל שמה הכיכר", sub: "1872 עד 1930",
+      title: say("צינה דיזנגוף", "Zina Dizengoff"), by: say("האישה שעל שמה הכיכר", "The woman the square is named after"), sub: say("1872 עד 1930", "1872 to 1930"),
       body: [],
-      extra: `<figure class="beside" style="width:9.5rem"><a href="${file}File:${name}" target="_blank" rel="noopener"><img src="${file}Special:FilePath/${name}?width=330" alt="דיוקן של צינה דיזנגוף" onerror="this.closest('figure').remove()"></a><figcaption>צילום: צבי אורון, שנות ה־20, עותק מעובד. הארכיון הציוני, ויקישיתוף, נחלת הכלל.</figcaption></figure>`
-        + p("צינה דיזנגוף הייתה אשתו של מאיר דיזנגוף, ראש העירייה הראשון של תל אביב. היא מתה בפברואר 1930. אחרי מותה תרם בעלה את ביתם להקמת מוזיאון לאמנות בעיר.")
-        + p("הכיכר נחנכה ב־26 בינואר 1938, ביום הזיכרון השמיני למותה. מאיר דיזנגוף לא ראה את הטקס: הוא נפטר ב־1936."),
-      credit: "מקורות: ויקיפדיה העברית, ומודעה עירונית מס׳ 4 של עיריית תל אביב.",
+      extra: `<figure class="beside" style="width:9.5rem"><a href="${file}File:${name}" target="_blank" rel="noopener"><img src="${file}Special:FilePath/${name}?width=330" alt="${say("דיוקן של צינה דיזנגוף", "Portrait of Zina Dizengoff")}" onerror="this.closest('figure').remove()"></a><figcaption>${say("צילום: צבי אורון, שנות ה־20, עותק מעובד. הארכיון הציוני, ויקישיתוף, נחלת הכלל.", "Photo: Zvi Oron, 1920s, retouched copy. Central Zionist Archives, Wikimedia Commons, public domain.")}</figcaption></figure>`
+        + p(say("צינה דיזנגוף הייתה אשתו של מאיר דיזנגוף, ראש העירייה הראשון של תל אביב. היא מתה בפברואר 1930. אחרי מותה תרם בעלה את ביתם להקמת מוזיאון לאמנות בעיר.", "Zina Dizengoff was the wife of Meir Dizengoff, the first mayor of Tel Aviv. She died in February 1930. After her death her husband gave their home to the city for an art museum."))
+        + p(say("הכיכר נחנכה ב־26 בינואר 1938, ביום הזיכרון השמיני למותה. מאיר דיזנגוף לא ראה את הטקס: הוא נפטר ב־1936.", "The square opened on 26 January 1938, the eighth memorial day of her death. Meir Dizengoff did not see the ceremony: he died in 1936.")),
+      credit: say("מקורות: ויקיפדיה העברית, ומודעה עירונית מס׳ 4 של עיריית תל אביב.", "Sources: Hebrew Wikipedia and Tel Aviv Municipality notice no. 4."),
       links: [
-        { t: "ויקיפדיה: צינה דיזנגוף", u: "https://he.wikipedia.org/wiki/%D7%A6%D7%99%D7%A0%D7%94_%D7%93%D7%99%D7%96%D7%A0%D7%92%D7%95%D7%A3" },
-        { t: "ויקיפדיה: כיכר צינה דיזנגוף", u: WIKI_SQ }
+        { t: say("ויקיפדיה: צינה דיזנגוף", "Hebrew Wikipedia: Zina Dizengoff"), u: "https://he.wikipedia.org/wiki/%D7%A6%D7%99%D7%A0%D7%94_%D7%93%D7%99%D7%96%D7%A0%D7%92%D7%95%D7%A3" },
+        { t: say("ויקיפדיה: כיכר צינה דיזנגוף", "Hebrew Wikipedia: Zina Dizengoff Square"), u: WIKI_SQ }
       ]
     };
   }
@@ -1815,37 +1911,88 @@ $("info-btn").addEventListener("click", () => openAbout());
     const photo = (name, alt, cap) => `<figure class="shot"><a href="${commons}File:${encodeURIComponent(name)}" target="_blank" rel="noopener"><img src="${commons}Special:FilePath/${encodeURIComponent(name)}?width=500" alt="${alt}" loading="lazy" onerror="this.closest('figure').remove()"></a><figcaption>${cap}</figcaption></figure>`;
     const era = (year, title, text, pictures) => `<h3>${year} · ${title}</h3><p>${text}</p>${pictures || ""}`;
     CARDS.levels = {
-      title: "הכיכר שעולה ויורדת", by: "הגלגולים שלה לאורך השנים", sub: "מ־1934 עד היום",
-      body: ["אותו מעגל, כמה כיכרות שונות. בסצנה רואים את הראשונה: שטוחה, בגובה הרחוב. לחיצה על תצלום פותחת אותו בגדול."],
+      title: say("הכיכר שעולה ויורדת", "The square that rose and fell"), by: say("הגלגולים שלה לאורך השנים", "Its changes through the years"), sub: say("מ־1934 עד היום", "From 1934 to today"),
+      body: [say("אותו מעגל, כמה כיכרות שונות. בסצנה רואים את הראשונה: שטוחה, בגובה הרחוב. לחיצה על תצלום פותחת אותו בגדול.", "One circle, several different squares. The scene shows the first: flat, at street level. Tap a photograph to see it full size.")],
       extra:
-        era("1934", "ההגבהה שנדחתה", "ג'ניה אוורבוך זכתה בתחרות לעיצוב הכיכר. בתוכנית המקורית הכיכר הייתה אמורה לעמוד כמטר מעל סביבתה, ומתחתיה תחנת מוניות וחניה. בגלל העלות הגבוהה ומיעוט כלי הרכב הוחלט לדחות את זה לעתיד.",
-          `<figure class="shot"><img src="${IMG_PLAN}" alt="תוכנית אוורבוך לסידור הכיכר" loading="lazy" onerror="this.parentNode.remove()"><figcaption>תוכנית אוורבוך לסידור הכיכר. ידיעות עיריית תל אביב.</figcaption></figure>`)
-        + era("1938", "החנוכה", "ב־26 בינואר 1938 נחנכה הכיכר: מעגל תנועה בקוטר של כ־66 מטר, ובמרכזו בריכה ומזרקה, דשא, שבילים וערוגות. לפי עיתון הארץ מהבוקר שאחרי, הגן הואר אז לראשונה בלילה והמזרקה זהרה באורות צבעוניים.",
-          photo("110274 tel aviv - dizengoff square PikiWiki Israel.png", "הכיכר והמזרקה בשנות השלושים", "שנות ה־30. צלם לא ידוע, ויקישיתוף, נחלת הכלל."))
-        + era("שנות ה־40", "מקום של טקסים", "על התצלום מוקלד Soldiers' Day, יום החייל: טורי חיילים צועדים בכיכר וקהל גדול מסביב. התאריך המדויק לא ידוע.",
-          photo("109688 tel aviv - dizengoff square PikiWiki Israel.png", "חיילים צועדים בכיכר דיזנגוף", "1941 עד 1943. צלם לא ידוע, ויקישיתוף, נחלת הכלל."))
-        + era("1948", "הגן גדל", "העצים והדקלים צמחו והכיכר נעשתה גן מוצל. הבניינים האחרונים סביבה הושלמו רק בשנות ה־50, ובמרץ 1959 נפתח בה כלבו המשביר לצרכן.",
-          photo("PikiWiki Israel 46886 Dizengoff Square in Tel Aviv.jpg", "צמחייה גבוהה והמזרקה", "1948 עד 1951. צלם לא ידוע, ויקישיתוף, נחלת הכלל."))
-        + era("1976", "הכיכר עולה", "ביולי 1976 התחילו העבודות, בתכנון האדריכל צבי לישר. רחוב דיזנגוף עבר ישר מתחת, והכיכר נבנתה מעליו. היא נחנכה ב־25 ביולי 1978.",
-          photo("Building the new circle on Dizengoff street in Tel Aviv (FL46002932).jpg", "הכיכר המוגבהת בבנייה מעל הכביש", "14 ביוני 1978. צילום: דני גוטפריד, אוסף דן הדני, הספרייה הלאומית, ויקישיתוף, CC BY 4.0."))
-        + era("1978", "קשתות זכוכית", "במרכז הבריכה החדשה, שנבנתה בממדי המקורית, הוצב פסל של אלן דוד: שלוש קשתות זכוכית ובתוכן מזרקה.",
-          photo("Building the new circle on Dizengoff street in Tel Aviv (FL62628168).jpg", "פסל הקשתות במרכז הבריכה", "1978. צלם IPPA, אוסף דן הדני, הספרייה הלאומית, ויקישיתוף, CC BY 4.0."))
-        + era("1986", "אש ומים", "ביולי 1986 הוחלף הפסל ב״אש ומים״, פסל קינטי של יעקב אגם.",
-          photo("כיכר דיזנגוף - אתרי מורשת בתל אביב 2016 (9).jpg", "מזרקת אגם מוארת בלילה", "צולם ב־2016. צילום: Chenspec, ויקישיתוף, CC BY-SA 4.0."))
-        + era("2017", "הכיכר יורדת", "ב־2016 החליטה העירייה להחזיר את הכיכר למתכונתה המקורית. ההריסה התחילה בינואר 2017, ובנובמבר 2018 הסתיימו העבודות והפסל של אגם חזר.",
-          photo("PikiWiki Israel 51775 dizengoff square - period of excavations.jpg", "הכיכר בזמן העבודות", "2018. צילום: שאולה הייטנר, ויקישיתוף (פיקיוויקי), CC BY 2.5."))
-        + era("היום", "שוב בגובה הרחוב", "הכיכר שוב שטוחה. התצלום נעשה מבניין קולנוע אסתר, היום מלון.",
-          photo("115057 zina dizengoff square day and night PikiWiki Israel.jpg", "הכיכר בלילה במבט מלמעלה", "2024. צילום: שלמה רודד, ויקישיתוף (פיקיוויקי), CC BY 2.5.")),
-      credit: "מקורות: ויקיפדיה העברית, כיכר צינה דיזנגוף. הציטוט מעיתון הארץ לפי אתר לוטוס הזהב.",
+        era("1934", say("ההגבהה שנדחתה", "The raised plan, put off"), say("ג'ניה אוורבוך זכתה בתחרות לעיצוב הכיכר. בתוכנית המקורית הכיכר הייתה אמורה לעמוד כמטר מעל סביבתה, ומתחתיה תחנת מוניות וחניה. בגלל העלות הגבוהה ומיעוט כלי הרכב הוחלט לדחות את זה לעתיד.", "Genia Averbuch won the competition to design the square. In the original plan the square was to stand about a metre above its surroundings, with a taxi stand and parking beneath. Because of the high cost and the small number of vehicles, this was left for the future."),
+          `<figure class="shot"><img src="${IMG_PLAN}" alt="${say("תוכנית אוורבוך לסידור הכיכר", "Averbuch's plan for the layout of the square")}" loading="lazy" onerror="this.parentNode.remove()"><figcaption>${say("תוכנית אוורבוך לסידור הכיכר. ידיעות עיריית תל אביב.", "Averbuch's plan for the layout of the square. Tel Aviv Municipality News.")}</figcaption></figure>`)
+        + era("1938", say("החנוכה", "The opening"), say("ב־26 בינואר 1938 נחנכה הכיכר: מעגל תנועה בקוטר של כ־66 מטר, ובמרכזו בריכה ומזרקה, דשא, שבילים וערוגות. לפי עיתון הארץ מהבוקר שאחרי, הגן הואר אז לראשונה בלילה והמזרקה זהרה באורות צבעוניים.", "The square opened on 26 January 1938: a roundabout about 66 metres across, with a pool and fountain in the middle, lawns, paths and flower beds. According to the newspaper Haaretz the next morning, the garden was then lit at night for the first time and the fountain glowed in coloured light."),
+          photo("110274 tel aviv - dizengoff square PikiWiki Israel.png", say("הכיכר והמזרקה בשנות השלושים", "The square and the fountain in the 1930s"), say("שנות ה־30. צלם לא ידוע, ויקישיתוף, נחלת הכלל.", "1930s. Photographer unknown, Wikimedia Commons, public domain.")))
+        + era(say("שנות ה־40", "1940s"), say("מקום של טקסים", "A place for ceremonies"), say("על התצלום מוקלד Soldiers' Day, יום החייל: טורי חיילים צועדים בכיכר וקהל גדול מסביב. התאריך המדויק לא ידוע.", "The words Soldiers' Day are typed on the print: columns of soldiers march through the square, with a large crowd around them. The exact date is unknown."),
+          photo("109688 tel aviv - dizengoff square PikiWiki Israel.png", say("חיילים צועדים בכיכר דיזנגוף", "Soldiers marching in Dizengoff Square"), say("1941 עד 1943. צלם לא ידוע, ויקישיתוף, נחלת הכלל.", "1941 to 1943. Photographer unknown, Wikimedia Commons, public domain.")))
+        + era("1948", say("הגן גדל", "The garden grows"), say("העצים והדקלים צמחו והכיכר נעשתה גן מוצל. הבניינים האחרונים סביבה הושלמו רק בשנות ה־50, ובמרץ 1959 נפתח בה כלבו המשביר לצרכן.", "The trees and palms grew and the square became a shady garden. The last buildings around it were finished only in the 1950s, and in March 1959 the Hamashbir LaTzarchan department store opened there."),
+          photo("PikiWiki Israel 46886 Dizengoff Square in Tel Aviv.jpg", say("צמחייה גבוהה והמזרקה", "Tall planting and the fountain"), say("1948 עד 1951. צלם לא ידוע, ויקישיתוף, נחלת הכלל.", "1948 to 1951. Photographer unknown, Wikimedia Commons, public domain.")))
+        + era("1976", say("הכיכר עולה", "The square goes up"), say("ביולי 1976 התחילו העבודות, בתכנון האדריכל צבי לישר. רחוב דיזנגוף עבר ישר מתחת, והכיכר נבנתה מעליו. היא נחנכה ב־25 ביולי 1978.", "Work began in July 1976, to a design by the architect Tsvi Lissar. Dizengoff Street ran straight underneath and the square was built above it. It opened on 25 July 1978."),
+          photo("Building the new circle on Dizengoff street in Tel Aviv (FL46002932).jpg", say("הכיכר המוגבהת בבנייה מעל הכביש", "The raised square being built over the road"), say("14 ביוני 1978. צילום: דני גוטפריד, אוסף דן הדני, הספרייה הלאומית, ויקישיתוף, CC BY 4.0.", "14 June 1978. Photo: Danny Gotfried, Dan Hadani Collection, National Library of Israel, Wikimedia Commons, CC BY 4.0.")))
+        + era("1978", say("קשתות זכוכית", "Glass arches"), say("במרכז הבריכה החדשה, שנבנתה בממדי המקורית, הוצב פסל של אלן דוד: שלוש קשתות זכוכית ובתוכן מזרקה.", "In the middle of the new pool, built to the size of the first one, stood a sculpture by Alain David: three glass arches with a fountain inside them."),
+          photo("Building the new circle on Dizengoff street in Tel Aviv (FL62628168).jpg", say("פסל הקשתות במרכז הבריכה", "The arches sculpture in the middle of the pool"), say("1978. צלם IPPA, אוסף דן הדני, הספרייה הלאומית, ויקישיתוף, CC BY 4.0.", "1978. Photo: IPPA, Dan Hadani Collection, National Library of Israel, Wikimedia Commons, CC BY 4.0.")))
+        + era("1986", say("אש ומים", "Fire and water"), say("ביולי 1986 הוחלף הפסל ב״אש ומים״, פסל קינטי של יעקב אגם.", "In July 1986 the sculpture was replaced by Fire and Water, a kinetic sculpture by Yaacov Agam."),
+          photo("כיכר דיזנגוף - אתרי מורשת בתל אביב 2016 (9).jpg", say("מזרקת אגם מוארת בלילה", "Agam's fountain lit at night"), say("צולם ב־2016. צילום: Chenspec, ויקישיתוף, CC BY-SA 4.0.", "Taken in 2016. Photo: Chenspec, Wikimedia Commons, CC BY-SA 4.0.")))
+        + era("2017", say("הכיכר יורדת", "The square comes down"), say("ב־2016 החליטה העירייה להחזיר את הכיכר למתכונתה המקורית. ההריסה התחילה בינואר 2017, ובנובמבר 2018 הסתיימו העבודות והפסל של אגם חזר.", "In 2016 the city decided to return the square to its original form. Demolition began in January 2017, and in November 2018 the work was finished and Agam's sculpture came back."),
+          photo("PikiWiki Israel 51775 dizengoff square - period of excavations.jpg", say("הכיכר בזמן העבודות", "The square during the works"), say("2018. צילום: שאולה הייטנר, ויקישיתוף (פיקיוויקי), CC BY 2.5.", "2018. Photo: Shaula Haitner, Wikimedia Commons (PikiWiki), CC BY 2.5.")))
+        + era(say("היום", "Today"), say("שוב בגובה הרחוב", "At street level again"), say("הכיכר שוב שטוחה. התצלום נעשה מבניין קולנוע אסתר, היום מלון.", "The square is flat again. The photograph was taken from the Esther Cinema building, now a hotel."),
+          photo("115057 zina dizengoff square day and night PikiWiki Israel.jpg", say("הכיכר בלילה במבט מלמעלה", "The square at night, seen from above"), say("2024. צילום: שלמה רודד, ויקישיתוף (פיקיוויקי), CC BY 2.5.", "2024. Photo: Shlomo Roded, Wikimedia Commons (PikiWiki), CC BY 2.5."))),
+      credit: say("מקורות: ויקיפדיה העברית, כיכר צינה דיזנגוף. הציטוט מעיתון הארץ לפי אתר לוטוס הזהב.", "Sources: Hebrew Wikipedia, Zina Dizengoff Square. The report from Haaretz is quoted from the Golden Lotus website."),
       links: [
-        { t: "ויקיפדיה: כיכר צינה דיזנגוף", u: WIKI_SQ },
-        { t: "לוטוס הזהב: כיכר צינה דיזנגוף", u: "https://golden-lotus.co.il/zina/" }
+        { t: say("ויקיפדיה: כיכר צינה דיזנגוף", "Hebrew Wikipedia: Zina Dizengoff Square"), u: WIKI_SQ },
+        { t: say("לוטוס הזהב: כיכר צינה דיזנגוף", "Golden Lotus: Zina Dizengoff Square (Hebrew)"), u: "https://golden-lotus.co.il/zina/" }
       ]
     };
   }
   // over the lawn on the north-west side of the pool
   addHotspot("levels", "person", P(12.5, D(318), 3.0), P(21.5, D(317), 1.7), P(4, D(320), 2.6));
   hotspots[hotspots.length - 1].aside = true;
+
+  // ---------- the cards in English (Zina, the levels, the cinema and "about" carry both languages in their own files) ----------
+  if (LANG_EN) {
+    const wiki = { t: "Hebrew Wikipedia: Zina Dizengoff Square", u: WIKI_SQ };
+    Object.assign(CARDS.opening, {
+      title: "The opening of Zina Dizengoff Square", by: "26 January 1938", sub: "The film: Carmel newsreel, Nathan Axelrod, January 1938",
+      body: [
+        "The square was opened at a public ceremony on Wednesday, 24 Shevat 5698, the eighth memorial day of Zina Dizengoff, wife of the late mayor Meir Dizengoff.",
+        "According to the municipal notice of the ceremony, the city planted and laid out the square in her memory, helped by contributions from city employees and from the owners of the houses and plots around it. The ceremony was set for 4:30 pm, and guests entered from Dizengoff Street, on the King George Street side.",
+        "The film runs a little over a minute. It shows the square by day and by night: a young palm, white benches, a view from above over the pool, and the fountain lit in the dark.",
+        "The captions say that the square was \u201Copened this week before a large crowd\u201D, that date palms brought from Gan Rachel in Kinneret were planted in it, and that 28 white benches, a fountain and lamps were set up there."
+      ],
+      credit: "Sources: Tel Aviv Municipality notice no. 4, the Israel Film Archive, and the film's captions (Carmel newsreel collection, Nathan Axelrod).",
+      links: [
+        { t: "The film on YouTube", u: CARDS.opening.links[0].u },
+        { t: "Israel Film Archive: the record of the film (Hebrew)", u: CARDS.opening.links[1].u },
+        wiki
+      ]
+    });
+    Object.assign(CARDS.video, {
+      title: "Here We Are: the opening titles", sub: "The square on television", by: "The square as a film set",
+      body: [
+        "The opening titles of the television series Here We Are were filmed here, in the square. The words of the theme song were changed so that children from all over the country could feel it was about them.",
+        "It is a natural choice: the square was the living room of Tel Aviv. Frames from the titles show a market stall, a caf\u00E9 with round tables and white metal chairs, and shops on the ground floor of the curved buildings. This is exactly the life the square was built for.",
+        "Note the difference: the titles were filmed in the square of the 1970s, after it had been raised above the road, not in the flat square of 1940 that you see here."
+      ],
+      credit: "Source: Hebrew Wikipedia, Zina Dizengoff Square. The description of the frames comes from watching the titles.",
+      links: [{ t: "The titles on YouTube", u: CARDS.video.links[0].u }, wiki]
+    });
+    const [portrait, drawing] = CARDS.genia.figs;
+    Object.assign(CARDS.genia, {
+      title: "Genia Averbuch", by: "Queen of Tel Aviv's Bauhaus", sub: "The square's architect · 1909 to 1977",
+      figs: [
+        Object.assign({}, portrait, { alt: "Genia Averbuch seated on a chair", cap: "Genia Averbuch. The source of the photograph is unidentified." }),
+        Object.assign({}, drawing, { alt: "Averbuch's plan for the square: a view from above and a model", cap: "Plan for the layout of Zina Dizengoff Square, Genia Averbuch. Tel Aviv Municipality News, issue 2, p. 51." })
+      ],
+      body: [
+        "She was 25 when she entered the 1934 competition to design the square, and her plan set the way the square looks to this day. The square opened on 26 January 1938.",
+        "She did not design only the garden in the middle. She set a binding code for everyone who built around it: curved fronts that carry on the line of the circle, long horizontal balcony bands and one height. The result is a single round street, not six separate buildings. Some of the buildings she designed herself.",
+        "In her plan you can see curved blocks around a central circle, with the gaps between them as the streets. In this reconstruction the angles of the streets and the shape of the blocks were measured from that plan.",
+        "Among her other works is Café Galina at the 1934 Levant Fair, together with Elsa Gidoni-Mandelstamm and Shlomo Ginsburg.",
+        "A note on the competition: the Hebrew Wikipedia says she won it. Another source says no first prize was awarded, and that she and Y. Grinetz shared second place."
+      ],
+      credit: "Sources: Hebrew Wikipedia (Zina Dizengoff Square), artlog, and Davidi's article on the Levant Fair.",
+      links: [
+        { t: "Wikipedia: Genia Averbuch", u: CARDS.genia.links[1].u },
+        { t: "Hebrew Wikipedia: Genia Averbuch", u: CARDS.genia.links[0].u },
+        { t: "Hebrew Wikipedia: Zina Dizengoff Square", u: WIKI_SQ }
+      ]
+    });
+  }
 
 // ---------- Genia Averbuch's card: the portrait beside the text, the plan where the text talks about it ----------
   {
@@ -1862,6 +2009,12 @@ $("info-btn").addEventListener("click", () => openAbout());
   // The film is silent about its own words on YouTube, so the site lays one line at a time over the player
   // (text: data/dizengoff_opening_he_fixed.srt, put in by make_site.py). YouTube's own captions stay off.
   const CAPTIONS = [[16.6, 18.76, "כיכר צינה דיזנגוף,"], [18.76, 21.279, "שנחנכה השבוע ברוב עם,"], [21.279, 24.263, "נמסרה לרשות הקהל התל אביבי"], [24.263, 25.64, "כשהיא מסודרה"], [25.64, 27.051, "לנוי ולתפארת."], [27.051, 29.439, "בין שטיחי הדשא וערוגות"], [29.439, 32.85, "הפרחים ניטעו גם עצי תמרים"], [32.85, 34.76, "שהובאו מגן רחל"], [34.76, 38.184, "בכנרת. 28 ספסלים לבנים,"], [38.184, 40.12, "מזרקת מים יפה"], [40.12, 43.293, "ופנסים יפים שיאירו בכל ערב"], [43.293, 44.879, "ישמשו את הקהל"], [44.879, 47.719, "למנוחתו."]];
+  const CAPTIONS_EN = [                                                // the same lines and times, translated
+    "Zina Dizengoff Square,", "opened this week before a large crowd,", "was handed to the public of Tel Aviv,", "laid out",
+    "in beauty and splendour.", "Among carpets of grass and beds", "of flowers, date palms were planted too,", "brought from Gan Rachel",
+    "in Kinneret. 28 white benches,", "a handsome water fountain", "and handsome lamps, lit every evening,", "will serve the public", "for its rest."
+  ];
+  if (LANG_EN && CAPTIONS_EN.length === CAPTIONS.length) CAPTIONS.forEach((c, i) => { c[2] = CAPTIONS_EN[i]; });
   let youtube = null;
   const youtubeApi = () => youtube || (youtube = new Promise((ok, no) => {
     if (window.YT && window.YT.Player) return ok();
@@ -1899,21 +2052,23 @@ $("info-btn").addEventListener("click", () => openAbout());
   // Posters: Wikimedia Commons files marked public domain (the American posters, not the local ones).
   {
     const commons = "https://commons.wikimedia.org/wiki/";
-    const poster = (file, name) => `<a href="${commons}File:${encodeURIComponent(file)}" target="_blank" rel="noopener"><img src="${commons}Special:FilePath/${encodeURIComponent(file)}?width=330" alt="כרזת הסרט ${name}" loading="lazy" onerror="this.parentNode.remove()"><span>${name}</span></a>`;
+    const poster = (file, name) => `<a href="${commons}File:${encodeURIComponent(file)}" target="_blank" rel="noopener"><img src="${commons}Special:FilePath/${encodeURIComponent(file)}?width=330" alt="${say("כרזת הסרט " + name, "Poster for " + name)}" loading="lazy" onerror="this.parentNode.remove()"><span>${name}</span></a>`;
+    const english = (day) => { const [d, m] = day.split("."); return m ? d + " " + "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split(" ")[m - 1] : "April"; };   // "1.4" reads as 1 Apr
     const PROGRAMME = "כרטיס לסרט שלגייה ושבעת הגמדים.jpg";
-    const films = (year, list) => `<h4>${year}</h4><ul class="films">${list.map(([day, he, en]) => `<li><time>${day}</time><span>${he}<bdi>${en}</bdi></span></li>`).join("")}</ul>`;
+    const films = (year, list) => `<h4>${year}</h4><ul class="films">${list.map(([day, he, en]) => `<li><time>${say(day, english(day))}</time><span>${say(`${he}<bdi>${en}</bdi>`, en)}</span></li>`).join("")}</ul>`;
+    if (LANG_EN) Object.assign(CARDS.esther, { title: "Dizengoff Square Cinema", by: "later the Esther Cinema" });
     Object.assign(CARDS.esther, {
-      sub: "נפתח ב־30 במרץ 1939",
+      sub: say("נפתח ב־30 במרץ 1939", "Opened on 30 March 1939"),
       body: [
-        "הבניין נבנה ב־1938 עד 1939 עבור אסתר ומשה נתנאל, בתכנון האדריכל יהודה מגידוביץ' ובנו, המהנדס רפאל מגידו. הוא עומד על עמודים, עם חזית קעורה ומרפסות סרט.",
-        "הקולנוע נפתח בשם קולנוע כיכר דיזנגוף. אחרי שנתו הראשונה שונה שמו לקולנוע אסתר, על שם אסתר נתנאל. המקורות לא נותנים תאריך מדויק לשינוי.",
-        "באולם היו כ־1,000 מקומות, והוא תואר כראשון בארץ עם מיזוג אוויר מרכזי. בבניין פעלו קפה אמנות עם רחבת ריקודים וחנות הכלבו אקמן. ב־1998 הוסב הבניין למלון."
+        say("הבניין נבנה ב־1938 עד 1939 עבור אסתר ומשה נתנאל, בתכנון האדריכל יהודה מגידוביץ' ובנו, המהנדס רפאל מגידו. הוא עומד על עמודים, עם חזית קעורה ומרפסות סרט.", "The building went up in 1938 and 1939 for Esther and Moshe Netanel, to a design by the architect Yehuda Magidovitch and his son, the engineer Raphael Megido. It stands on columns, with a concave front and ribbon balconies."),
+        say("הקולנוע נפתח בשם קולנוע כיכר דיזנגוף. אחרי שנתו הראשונה שונה שמו לקולנוע אסתר, על שם אסתר נתנאל. המקורות לא נותנים תאריך מדויק לשינוי.", "The cinema opened as the Dizengoff Square Cinema. After its first year it was renamed the Esther Cinema, after Esther Netanel. The sources give no exact date for the change."),
+        say("באולם היו כ־1,000 מקומות, והוא תואר כראשון בארץ עם מיזוג אוויר מרכזי. בבניין פעלו קפה אמנות עם רחבת ריקודים וחנות הכלבו אקמן. ב־1998 הוסב הבניין למלון.", "The hall had about 1,000 seats and was described as the first in the country with central air conditioning. The building also held Café Omanut, with a dance floor, and the Ackerman department store. In 1998 it was turned into a hotel.")
       ],
-      extra: `<h3>תוכניית ערב הפתיחה</h3>
-        <figure class="programme"><a href="${commons}File:${encodeURIComponent(PROGRAMME)}" target="_blank" rel="noopener"><img src="${commons}Special:FilePath/${encodeURIComponent(PROGRAMME)}" alt="תוכניית הפתיחה של קולנוע כיכר דיזנגוף, מרץ 1939, בעברית ובאנגלית" loading="lazy" onerror="this.closest('figure').remove()"></a><figcaption>צילום: דני גולדשמיד, ויקישיתוף, CC BY-SA 3.0. לחיצה פותחת בגדול.</figcaption></figure>
-        <p>בערב הפתיחה, 30 במרץ 1939, בחסות ראש העירייה ישראל רוקח: יומן פרמאונט, קטעי הווי מהארץ, סרט קצר, הפסקה, ואז שלגיה ושבעת הגמדים. בהצגות היומיות בחג הפסח הוקרן שירת המיסיסיפי עם בובי ברין.</p>
-        <h3>על המסך</h3>
-        <div class="posters">${poster("Snow White and the Seven Dwarfs (Style B) poster.jpg", "שלגיה ושבעת הגמדים")}${poster("The Adventures of Robin Hood (1938 poster).jpg", "רובין הוד")}${poster("Fourdaughters1938.JPG", "חלומות נעורים")}</div>
+      extra: `<h3>${say("תוכניית ערב הפתיחה", "The programme of the opening night")}</h3>
+        <figure class="programme"><a href="${commons}File:${encodeURIComponent(PROGRAMME)}" target="_blank" rel="noopener"><img src="${commons}Special:FilePath/${encodeURIComponent(PROGRAMME)}" alt="${say("תוכניית הפתיחה של קולנוע כיכר דיזנגוף, מרץ 1939, בעברית ובאנגלית", "The opening programme of the Dizengoff Square Cinema, March 1939, in Hebrew and English")}" loading="lazy" onerror="this.closest('figure').remove()"></a><figcaption>${say("צילום: דני גולדשמיד, ויקישיתוף, CC BY-SA 3.0. לחיצה פותחת בגדול.", "Photo: Danny Goldschmidt, Wikimedia Commons, CC BY-SA 3.0. Tap to see it full size.")}</figcaption></figure>
+        <p>${say("בערב הפתיחה, 30 במרץ 1939, בחסות ראש העירייה ישראל רוקח: יומן פרמאונט, קטעי הווי מהארץ, סרט קצר, הפסקה, ואז שלגיה ושבעת הגמדים. בהצגות היומיות בחג הפסח הוקרן שירת המיסיסיפי עם בובי ברין.", "On the opening night, 30 March 1939, under the patronage of Mayor Israel Rokach: Paramount News, scenes of life in the country, a short film, an interval, and then Snow White and the Seven Dwarfs. The daily Passover shows screened Rainbow on the River with Bobby Breen.")}</p>
+        <h3>${say("על המסך", "On screen")}</h3>
+        <div class="posters">${poster("Snow White and the Seven Dwarfs (Style B) poster.jpg", say("שלגיה ושבעת הגמדים", "Snow White"))}${poster("The Adventures of Robin Hood (1938 poster).jpg", say("רובין הוד", "Robin Hood"))}${poster("Fourdaughters1938.JPG", say("חלומות נעורים", "Four Daughters"))}</div>
         ${films("1939", [
           ["1.4", "שלגיה ושבעת הגמדים", "Snow White and the Seven Dwarfs"],
           ["2.4", "שירת המיסיסיפי", "Rainbow on the River"],
@@ -1930,12 +2085,13 @@ $("info-btn").addEventListener("click", () => openAbout());
           ["13.7", "הנערה ממקסיקו", "The Girl from Mexico"],
           ["7.9", "מאה השנים הראשונות", "The First Hundred Years"],
           ["30.11", "קפה סוסייטי", "Café Society"]])}
-        <p>שלט המתכת על הקיר בסצנה הוא עיצוב של השחזור. בגלויה מהתקופה נראות שם אותיות אדומות אנכיות. הכרזה שמתחתיו היא הכרזה האמריקאית של חלומות נעורים, לא הכרזה שנתלתה בקולנוע. הכרזה על המרפסת עם שמה של אליזבת ברגנר מופיעה בגלויה.</p>`,
-      credit: "מבחר מתוך רשומות ההקרנה בפרויקט ירושלים סגל, הספרייה לקולנוע והארכיון בסינמטק תל אביב. רובין הוד לפי עיתון דבר, ושירת המיסיסיפי לפי תוכניית הפתיחה. הכרזות הן הכרזות האמריקאיות, מוויקישיתוף, בנחלת הכלל.",
+        <p>${say("שלט המתכת על הקיר בסצנה הוא עיצוב של השחזור. בגלויה מהתקופה נראות שם אותיות אדומות אנכיות. הכרזה שמתחתיו היא הכרזה האמריקאית של חלומות נעורים, לא הכרזה שנתלתה בקולנוע. הכרזה על המרפסת עם שמה של אליזבת ברגנר מופיעה בגלויה.", "The metal sign on the wall in the scene was designed for this reconstruction. A postcard of the time shows red vertical letters there. The poster below it is the American poster for Four Daughters, not the one that hung at the cinema. The poster on the balcony with Elisabeth Bergner's name appears in the postcard.")}</p>`,
+      credit: say("מבחר מתוך רשומות ההקרנה בפרויקט ירושלים סגל, הספרייה לקולנוע והארכיון בסינמטק תל אביב. רובין הוד לפי עיתון דבר, ושירת המיסיסיפי לפי תוכניית הפתיחה. הכרזות הן הכרזות האמריקאיות, מוויקישיתוף, בנחלת הכלל.",
+        "A selection from the screening records of the Jerusalem Segal Project, the film library and archive of the Tel Aviv Cinematheque. Robin Hood after the newspaper Davar, and Rainbow on the River after the opening programme. The posters are the American ones, from Wikimedia Commons, public domain."),
       links: [
-        { t: "ויקיפדיה: קולנוע אסתר", u: "https://he.wikipedia.org/wiki/%D7%A7%D7%95%D7%9C%D7%A0%D7%95%D7%A2_%D7%90%D7%A1%D7%AA%D7%A8" },
-        { t: "טבלת ההקרנות של ארכיון סינמטק תל אביב", u: "https://www.cinema.co.il/wp-content/uploads/2025/01/%D7%A4%D7%A8%D7%95%D7%99%D7%A7%D7%98-%D7%99%D7%A8%D7%95%D7%A9%D7%9C%D7%99%D7%9D-%D7%A1%D7%92%D7%9C-.pdf" },
-        { t: "לוטוס הזהב: קולנוע אסתר", u: "https://golden-lotus.co.il/esther/" }
+        { t: say("ויקיפדיה: קולנוע אסתר", "Hebrew Wikipedia: Esther Cinema"), u: "https://he.wikipedia.org/wiki/%D7%A7%D7%95%D7%9C%D7%A0%D7%95%D7%A2_%D7%90%D7%A1%D7%AA%D7%A8" },
+        { t: say("טבלת ההקרנות של ארכיון סינמטק תל אביב", "Tel Aviv Cinematheque archive: table of screenings (Hebrew)"), u: "https://www.cinema.co.il/wp-content/uploads/2025/01/%D7%A4%D7%A8%D7%95%D7%99%D7%A7%D7%98-%D7%99%D7%A8%D7%95%D7%A9%D7%9C%D7%99%D7%9D-%D7%A1%D7%92%D7%9C-.pdf" },
+        { t: say("לוטוס הזהב: קולנוע אסתר", "Golden Lotus: Esther Cinema (Hebrew)"), u: "https://golden-lotus.co.il/esther/" }
       ]
     });
   }
@@ -1948,45 +2104,45 @@ $("info-btn").addEventListener("click", () => openAbout());
     const shot = (src, cap) => `<figure class="shot"><img src="../about/${src}.webp" alt="${cap}" loading="lazy" onerror="const li = this.closest('li'); this.parentNode.remove(); if (li && li.dataset.needs && !li.querySelector('figure')) li.remove();"><figcaption>${cap}</figcaption></figure>`;
     const step = (title, text, pictures, needs) => `<li${needs ? ' data-needs="1"' : ""}><h4>${title}</h4><p>${text}</p>${pictures || ""}</li>`;
     const social = (url, label, icon) => `<a href="${url}" target="_blank" rel="noopener" aria-label="${label}" title="${label}"><i class="fa-brands ${icon}" aria-hidden="true"></i></a>`;
-    card.innerHTML = `<div class="head"><div><h2 id="card-title">אודות הפרויקט</h2><p class="by">כיכר צינה דיזנגוף, מהחנוכה ב־1938</p></div><button class="x" id="card-x" aria-label="סגירה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="scroll">
-      <p class="lead">שחזור תלת־ממדי של הכיכר בשנים הראשונות שלה. בתוכה מחכות נקודות מידע על הרגעים והאנשים המרכזיים: לחצו על אחת מהן וגלו את הסיפור.</p>
+    card.innerHTML = `<div class="head"><div><h2 id="card-title">${say("אודות הפרויקט", "About the project")}</h2><p class="by">${say("כיכר צינה (דיזנגוף), מהחנוכה ב־1938", "Zina Square (Dizengoff), from its opening in 1938")}</p></div><button class="x" id="card-x" aria-label="סגירה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="scroll">
+      <p class="lead">${say("שחזור תלת־ממדי של הכיכר בשנים הראשונות שלה. בתוכה מחכות נקודות מידע על הרגעים והאנשים המרכזיים: לחצו על אחת מהן וגלו את הסיפור.", "A 3D reconstruction of the square in its first years. Inside it, points of information wait with the main moments and people: tap one and discover the story.")}</p>
       <section class="creator">
-        <div class="who"><img src="../about/yuval.webp" alt="" width="34" height="34"><h4>אודות היוצר: יובל כהן</h4></div>
-        <p>חוקר עולמות תלת־ממד וטכנולוגיה וחובב היסטוריה מושבע. ניסיתי להחזיר את הכיכר לחיים, כדי שאפשר יהיה לעמוד בתוכה ולגלות אותה מחדש.</p>
-        <div class="socials">${social(LINKEDIN, "לינקדאין", "fa-linkedin-in")}${WHATSAPP ? social("https://wa.me/" + WHATSAPP, "וואטסאפ", "fa-whatsapp") : ""}</div>
+        <div class="who"><img src="../about/yuval.webp" alt="" width="34" height="34"><h4>${say("אודות היוצר: יובל כהן", "About the creator: Yuval Cohen")}</h4></div>
+        <p>${say("חוקר עולמות תלת־ממד וטכנולוגיה וחובב היסטוריה מושבע. ניסיתי להחזיר את הכיכר לחיים, כדי שאפשר יהיה לעמוד בתוכה ולגלות אותה מחדש.", "An explorer of 3D worlds and technology, and a devoted lover of history. I tried to bring the square back to life, so that you can stand inside it and discover it again.")}</p>
+        <div class="socials">${social(LINKEDIN, say("לינקדאין", "LinkedIn"), "fa-linkedin-in")}${WHATSAPP ? social("https://wa.me/" + WHATSAPP, say("וואטסאפ", "WhatsApp"), "fa-whatsapp") : ""}</div>
       </section>
-      <h3>איך זה נבנה</h3>
+      <h3>${say("איך זה נבנה", "How it was built")}</h3>
       <ol class="steps">
-        ${step("מחקר", "מתי נבנתה הכיכר, מי תכנן אותה ואיך נראתה. היא נחנכה ב־26 בינואר 1938 לפי תוכנית של ג'ניה אוורבוך. נאספו עשרות תצלומים בשחור לבן מזוויות שונות, פריימים מיומן קולנוע ומודעה עירונית, ומוינו לפי תקופה: מה מתאים ל־1940 ומה מאוחר יותר.")}
-        ${step("אז מול היום", "מפת OpenStreetMap של היום הושוותה לתצלומי התקופה: צורות הבניינים, כיווני הרחובות ושמות הבתים. ששת בנייני הטבעת סומנו A עד F, וכל אחד קיבל חזית משלו. הקולנוע הותאם לתצלומים, ושאר החזיתות הן פרשנות.",
-          shot("map", "ששת בנייני הטבעת והרחובות. © תורמי OpenStreetMap") + shot("archive/corners", "סימון פינות ופרטי חזית על גבי תצלומים") + shot("archive/facades", "חזיתות: תצלום מול הניסיון הראשון"))}
-        ${step("צבע לתחושה", "תצלומים בשחור לבן נצבעו בבינה מלאכותית. הצבעים מומצאים ולא מדויקים, אבל הם נתנו תחושה של איך זה היה נראה ועזרו מאוד לשפר את הסצנה.",
-          shot("archive/colour_square", "למעלה התצלום, למטה הגרסה הצבועה") + shot("archive/colour_street", "אותה פינה, בשחור לבן ובצבע"))}
-        ${step("גרסה ראשונה בדפדפן", "בהתחלה הכול נבנה ישירות ב־Three.js, בקוד, בלי Blender. כך נבדקו הפריסה, המידות והתנועה בכיכר.",
-          shot("facelift", "גלגולי הגרסה הראשונה, לפני ואחרי"))}
-        ${step("המעבר ל־Blender", "כשהבסיס ב־Three.js היה טוב מספיק, חובר Blender דרך MCP, ומשם כל השלבים נעשו בו: קודם גושים לפי המפה, אחר כך טבעות הגן, ולבסוף חזיתות באוהאוס, צמחייה, מזרקה, רכבים ואנשים.",
-          shot("massing", "הגושים הראשונים ב־Blender") + shot("early", "הגן מתחיל לקבל צורה") + shot("render", "רינדור מתוך הכיכר"))}
-        ${step("מדידה מתוך תצלומים", "מצלמה וירטואלית הותאמה לזווית של תצלום, ורשת וקווים הונחו עליו עד שהתיישבו. כך יצאו בריכה ברדיוס של כ־8.4 מטר ומדשאה פנימית עד כ־16 מטר.",
-          shot("archive/measure", "קווי המדידה, על תצלום מאוחר מ־1940") + shot("archive/grid_square", "רשת מדידה על תצלום המזרקה") + shot("archive/grid_cinema", "רשת מדידה על תצלום הקולנוע"))}
-        ${step("תצלום מול שחזור", "אותה זווית מצלמה: למעלה התצלום, למטה השחזור. כך רואים מה כבר דומה ומה עוד לא.",
-          shot("archive/compare_square", "הבריכה, הגדר והטבעות. זיהוי הרחוב בתצלום הזה לא ודאי") + shot("archive/compare_cinema", "קולנוע כיכר דיזנגוף. התצלום מאוחר מ־1940"), true)}
-        ${step("אל הדפדפן", "הדגם יוצא בחזרה לאתר שרץ ב־Three.js, ונדחס לכ־6 מגה כדי להיטען מהר גם בטלפון. הכלים: Blender, Three.js, OpenStreetMap ו־Claude Code.")}
+        ${step(say("מחקר", "Research"), say("מתי נבנתה הכיכר, מי תכנן אותה ואיך נראתה. היא נחנכה ב־26 בינואר 1938 לפי תוכנית של ג'ניה אוורבוך. נאספו עשרות תצלומים בשחור לבן מזוויות שונות, פריימים מיומן קולנוע ומודעה עירונית, ומוינו לפי תקופה: מה מתאים ל־1940 ומה מאוחר יותר.", "When the square was built, who designed it and how it looked. It opened on 26 January 1938 to a plan by Genia Averbuch. Dozens of black and white photographs from different angles were collected, with frames from a newsreel and a municipal notice, and sorted by period: what fits 1940 and what is later."))}
+        ${step(say("אז מול היום", "Then and now"), say("מפת OpenStreetMap של היום הושוותה לתצלומי התקופה: צורות הבניינים, כיווני הרחובות ושמות הבתים. ששת בנייני הטבעת סומנו A עד F, וכל אחד קיבל חזית משלו. הקולנוע הותאם לתצלומים, ושאר החזיתות הן פרשנות.", "Today's OpenStreetMap map was compared with photographs of the time: the shapes of the buildings, the directions of the streets and the names of the houses. The six buildings of the ring were marked A to F, and each got its own front. The cinema was matched to photographs; the other fronts are interpretation."),
+          shot("map", say("ששת בנייני הטבעת והרחובות. © תורמי OpenStreetMap", "The six buildings of the ring and the streets. © OpenStreetMap contributors")) + shot("archive/corners", say("סימון פינות ופרטי חזית על גבי תצלומים", "Corners and facade details marked on photographs")) + shot("archive/facades", say("חזיתות: תצלום מול הניסיון הראשון", "Facades: photograph beside the first attempt")))}
+        ${step(say("צבע לתחושה", "Colour, for the feel"), say("תצלומים בשחור לבן נצבעו בבינה מלאכותית. הצבעים מומצאים ולא מדויקים, אבל הם נתנו תחושה של איך זה היה נראה ועזרו מאוד לשפר את הסצנה.", "Black and white photographs were coloured with AI. The colours are invented and not accurate, but they gave a feeling of how it may have looked and helped a great deal to improve the scene."),
+          shot("archive/colour_square", say("למעלה התצלום, למטה הגרסה הצבועה", "Above the photograph, below the coloured version")) + shot("archive/colour_street", say("אותה פינה, בשחור לבן ובצבע", "The same corner, in black and white and in colour")))}
+        ${step(say("גרסה ראשונה בדפדפן", "A first version in the browser"), say("בהתחלה הכול נבנה ישירות ב־Three.js, בקוד, בלי Blender. כך נבדקו הפריסה, המידות והתנועה בכיכר.", "At first everything was built straight in Three.js, in code, without Blender. This is how the layout, the sizes and the traffic of the square were tested."),
+          shot("facelift", say("גלגולי הגרסה הראשונה, לפני ואחרי", "Stages of the first version, before and after")))}
+        ${step(say("המעבר ל־Blender", "Moving to Blender"), say("כשהבסיס ב־Three.js היה טוב מספיק, חובר Blender דרך MCP, ומשם כל השלבים נעשו בו: קודם גושים לפי המפה, אחר כך טבעות הגן, ולבסוף חזיתות באוהאוס, צמחייה, מזרקה, רכבים ואנשים.", "Once the Three.js base was good enough, Blender was connected through MCP, and every stage from then on was done in it: first blocks after the map, then the rings of the garden, and finally Bauhaus facades, planting, the fountain, cars and people."),
+          shot("massing", say("הגושים הראשונים ב־Blender", "The first blocks in Blender")) + shot("early", say("הגן מתחיל לקבל צורה", "The garden takes shape")) + shot("render", say("רינדור מתוך הכיכר", "A render from inside the square")))}
+        ${step(say("מדידה מתוך תצלומים", "Measuring from photographs"), say("מצלמה וירטואלית הותאמה לזווית של תצלום, ורשת וקווים הונחו עליו עד שהתיישבו. כך יצאו בריכה ברדיוס של כ־8.4 מטר ומדשאה פנימית עד כ־16 מטר.", "A virtual camera was matched to the angle of a photograph, and a grid and lines were laid over it until they sat right. This gave a pool with a radius of about 8.4 metres and an inner lawn reaching about 16 metres."),
+          shot("archive/measure", say("קווי המדידה, על תצלום מאוחר מ־1940", "Measuring lines, on a photograph later than 1940")) + shot("archive/grid_square", say("רשת מדידה על תצלום המזרקה", "Measuring grid on the photograph of the fountain")) + shot("archive/grid_cinema", say("רשת מדידה על תצלום הקולנוע", "Measuring grid on the photograph of the cinema")))}
+        ${step(say("תצלום מול שחזור", "Photograph and reconstruction"), say("אותה זווית מצלמה: למעלה התצלום, למטה השחזור. כך רואים מה כבר דומה ומה עוד לא.", "The same camera angle: the photograph above, the reconstruction below. It shows what is already alike and what is not yet."),
+          shot("archive/compare_square", say("הבריכה, הגדר והטבעות. זיהוי הרחוב בתצלום הזה לא ודאי", "The pool, the fence and the rings. The street in this photograph is not identified for certain")) + shot("archive/compare_cinema", say("קולנוע כיכר דיזנגוף. התצלום מאוחר מ־1940", "Dizengoff Square Cinema. The photograph is later than 1940")), true)}
+        ${step(say("אל הדפדפן", "Back to the browser"), say("הדגם יוצא בחזרה לאתר שרץ ב־Three.js, ונדחס לכ־6 מגה כדי להיטען מהר גם בטלפון. הכלים: Blender, Three.js, OpenStreetMap ו־Claude Code.", "The model is exported back to the website, which runs on Three.js, and compressed to about 6 MB so that it loads quickly on phones too. Tools: Blender, Three.js, OpenStreetMap and Claude Code."))}
       </ol>
-      <h3>מה מדויק ומה משוער</h3>
+      <h3>${say("מה מדויק ומה משוער", "What is accurate and what is estimated")}</h3>
       ${$("notes").querySelector("ul").outerHTML}
-      <section class="share-end"><h3>נהניתם לטייל בהיסטוריה בתלת־ממד?</h3><p>שתפו את הכיכר עם מי שיאהב אותה.</p><button class="share-btn" id="card-share">שיתוף</button></section>
-      <section class="rights"><h3>זכויות יוצרים וקרדיטים</h3>
+      <section class="share-end"><h3>${say("נהניתם לטייל בהיסטוריה בתלת־ממד?", "Enjoyed a walk through history in 3D?")}</h3><p>${say("שתפו את הכיכר עם מי שיאהב אותה.", "Share the square with someone who will love it.")}</p><button class="share-btn" id="card-share">${say("שיתוף", "Share")}</button></section>
+      <section class="rights"><h3>${say("זכויות יוצרים וקרדיטים", "Copyright and credits")}</h3>
       <ul>
-        <li>תצלומים בחלונות המידע: ויקישיתוף, ובהם פיקיוויקי, אוסף דן הדני בספרייה הלאומית והארכיון הציוני. שם הצלם והרישיון מופיעים ליד התצלומים. מקור דיוקנה של ג'ניה אוורבוך לא זוהה.</li>
-        <li>תוכנית אוורבוך לכיכר: ידיעות עיריית תל אביב.</li>
-        <li>סרט חנוכת הכיכר: אוסף יומני כרמל (נתן אקסלרוד), ארכיון הסרטים הישראלי. הסרטונים מוצגים בנגן המוטמע של YouTube.</li>
-        <li>רשומות ההקרנה: פרויקט ירושלים סגל, סינמטק תל אביב. כרזות הסרטים: ויקישיתוף, נחלת הכלל.</li>
-        <li>מפת הבניינים והרחובות: © תורמי <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener"><bdi>OpenStreetMap</bdi></a>, רישיון ODbL.</li>
-        <li>שמיים: <a href="https://polyhaven.com" target="_blank" rel="noopener"><bdi>Poly Haven</bdi></a>, רישיון CC0. תלת־ממד: <a href="https://threejs.org" target="_blank" rel="noopener"><bdi>Three.js</bdi></a>, רישיון MIT. אייקונים: <a href="https://fontawesome.com/license/free" target="_blank" rel="noopener"><bdi>Font Awesome Free</bdi></a>. גופנים: Google Fonts, רישיון OFL.</li>
-        <li>איורי חזיתות החנויות והגרסאות הצבועות של התצלומים נוצרו בבינה מלאכותית.</li>
+        <li>${say("תצלומים בחלונות המידע: ויקישיתוף, ובהם פיקיוויקי, אוסף דן הדני בספרייה הלאומית והארכיון הציוני. שם הצלם והרישיון מופיעים ליד התצלומים. מקור דיוקנה של ג'ניה אוורבוך לא זוהה.", "Photographs in the information windows: Wikimedia Commons, including PikiWiki, the Dan Hadani Collection at the National Library of Israel and the Central Zionist Archives. The photographer and the licence are named beside the photographs. The source of the portrait of Genia Averbuch has not been identified.")}</li>
+        <li>${say("תוכנית אוורבוך לכיכר: ידיעות עיריית תל אביב.", "Averbuch's plan for the square: Tel Aviv Municipality News.")}</li>
+        <li>${say("סרט חנוכת הכיכר: אוסף יומני כרמל (נתן אקסלרוד), ארכיון הסרטים הישראלי. הסרטונים מוצגים בנגן המוטמע של YouTube.", "The film of the opening: Carmel newsreel collection (Nathan Axelrod), Israel Film Archive. Videos play in the embedded YouTube player.")}</li>
+        <li>${say("רשומות ההקרנה: פרויקט ירושלים סגל, סינמטק תל אביב. כרזות הסרטים: ויקישיתוף, נחלת הכלל.", "Screening records: Jerusalem Segal Project, Tel Aviv Cinematheque. Film posters: Wikimedia Commons, public domain.")}</li>
+        <li>${say("מפת הבניינים והרחובות: © תורמי", "Map of buildings and streets: © contributors of")} <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener"><bdi>OpenStreetMap</bdi></a>, ${say("רישיון ODbL", "ODbL licence")}.</li>
+        <li>${say("שמיים", "Sky")}: <a href="https://polyhaven.com" target="_blank" rel="noopener"><bdi>Poly Haven</bdi></a>, ${say("רישיון CC0. תלת־ממד", "CC0 licence. 3D")}: <a href="https://threejs.org" target="_blank" rel="noopener"><bdi>Three.js</bdi></a>, ${say("רישיון MIT. אייקונים", "MIT licence. Icons")}: <a href="https://fontawesome.com/license/free" target="_blank" rel="noopener"><bdi>Font Awesome Free</bdi></a>. ${say("גופנים: Google Fonts, רישיון OFL", "Fonts: Google Fonts, OFL licence")}.</li>
+        <li>${say("איורי חזיתות החנויות והגרסאות הצבועות של התצלומים נוצרו בבינה מלאכותית.", "The shopfront illustrations and the coloured versions of the photographs were made with AI.")}</li>
       </ul>
-      <p class="credit">הדמויות מבוססות על הדגמים <a href="https://polyfork.dev/asset/audience-gentleman-base" target="_blank" rel="noopener"><bdi>Audience gentleman</bdi></a>, <a href="https://polyfork.dev/asset/human-vest-shorts-base" target="_blank" rel="noopener"><bdi>Human vest shorts</bdi></a>, <a href="https://polyfork.dev/asset/taverna-waiter-base" target="_blank" rel="noopener"><bdi>Taverna waiter</bdi></a>, <a href="https://polyfork.dev/asset/older-woman-with-a-basket-base" target="_blank" rel="noopener"><bdi>Older woman with a basket</bdi></a>, <a href="https://polyfork.dev/asset/teen-audience-member-base" target="_blank" rel="noopener"><bdi>Teen audience member</bdi></a>, <a href="https://polyfork.dev/asset/child-at-the-fun-fair-base" target="_blank" rel="noopener"><bdi>Child at the fun fair</bdi></a> מאת <a href="https://polyfork.dev" target="_blank" rel="noopener"><bdi>Polyfork</bdi></a>, ברישיון <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener"><bdi>CC BY 4.0</bdi></a>. הדגמים שונו: צבעים, לבוש, כובעים, תנוחות והפחתת פרטים.</p>
-      <p class="credit">זכויות היוצרים בתצלומים, בסרטים ובחומרי הארכיון שמורות לבעליהן. לתיקון קרדיט או להסרה אפשר לפנות בוואטסאפ שבראש החלון.</p></section>
+      <p class="credit">${say("הדמויות מבוססות על הדגמים", "The figures are based on the models")} <a href="https://polyfork.dev/asset/audience-gentleman-base" target="_blank" rel="noopener"><bdi>Audience gentleman</bdi></a>, <a href="https://polyfork.dev/asset/human-vest-shorts-base" target="_blank" rel="noopener"><bdi>Human vest shorts</bdi></a>, <a href="https://polyfork.dev/asset/taverna-waiter-base" target="_blank" rel="noopener"><bdi>Taverna waiter</bdi></a>, <a href="https://polyfork.dev/asset/older-woman-with-a-basket-base" target="_blank" rel="noopener"><bdi>Older woman with a basket</bdi></a>, <a href="https://polyfork.dev/asset/teen-audience-member-base" target="_blank" rel="noopener"><bdi>Teen audience member</bdi></a>, <a href="https://polyfork.dev/asset/child-at-the-fun-fair-base" target="_blank" rel="noopener"><bdi>Child at the fun fair</bdi></a> ${say("מאת", "by")} <a href="https://polyfork.dev" target="_blank" rel="noopener"><bdi>Polyfork</bdi></a>, ${say("ברישיון", "licensed")} <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener"><bdi>CC BY 4.0</bdi></a>. ${say("הדגמים שונו: צבעים, לבוש, כובעים, תנוחות והפחתת פרטים", "The models were changed: colours, clothes, hats, poses and less detail")}.</p>
+      <p class="credit">${say("זכויות היוצרים בתצלומים, בסרטים ובחומרי הארכיון שמורות לבעליהן. לתיקון קרדיט או להסרה אפשר לפנות בוואטסאפ שבראש החלון.", "Copyright in the photographs, films and archive material stays with its owners. To correct a credit or ask for removal, write on WhatsApp using the button near the top of this window.")}</p></section>
     </div>`;
     card.hidden = false; $("veil").hidden = false; $("notes").hidden = true;
     $("card-x").addEventListener("click", closeCard); $("card-share").addEventListener("click", (e) => share(e.currentTarget)); $("card-x").focus({ preventScroll: true });
@@ -1994,7 +2150,8 @@ $("info-btn").addEventListener("click", () => openAbout());
   }
 
   // ---------- sharing the square: from the round button and from the end of "about" ----------
-  const SHARE = { title: "כיכר צינה דיזנגוף 1940", text: "מכירים את כיכר דיזנגוף? לא ככה. שחזור תלת־ממדי של הכיכר כמו שנראתה סביב 1940. מסתובבים בה ישר מהטלפון." };
+  const SHARE = LANG_EN ? { title: "Zina Square (Dizengoff) 1940", text: "Think you know Dizengoff Square? Not like this. A 3D reconstruction of the square as it looked around 1940. Walk around it right from your phone." }
+    : { title: "כיכר צינה (דיזנגוף) 1940", text: "מכירים את כיכר דיזנגוף? לא ככה. שחזור תלת־ממדי של הכיכר כמו שנראתה סביב 1940. מסתובבים בה ישר מהטלפון." };
   function copyText(text) {                                  // the clipboard API needs https or localhost
     if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
     const t = document.createElement("textarea"); t.value = text; t.style.cssText = "position:fixed;opacity:0";
@@ -2003,7 +2160,7 @@ $("info-btn").addEventListener("click", () => openAbout());
     return ok ? Promise.resolve() : Promise.reject(new Error("copy"));
   }
   function share(button) {
-    const url = location.origin + location.pathname.replace(/index\.html$/, "");
+    const url = location.origin + location.pathname.replace(/index\.html$/, "") + (LANG_EN ? "?lang=en" : "");
     // the bar, with its hint, is out of sight while a card is open: then the pressed button says it
     const say = (text) => { if (button) button.textContent = text; else { hintEl.textContent = text; showHint(); } };
     const copy = () => copyText(SHARE.text + "\n" + url).then(() => say("הקישור הועתק"), () => say("העתיקו את הקישור משורת הכתובת"));
@@ -2248,6 +2405,71 @@ $("info-btn").addEventListener("click", () => openAbout());
     NIGHT.cinema = { all, heads, wash, lens };
   }
 
+  // ---------- the moving cars: two warm headlamps with their light on the road, and two red lamps behind ----------
+  // All of them together are three draw calls, moved each frame with their cars. The cart and parked cars stay dark.
+  function carThings() {
+    if (NIGHT.cars) NIGHT.cars.all.forEach((o) => scene.remove(o));
+    const list = [], m4 = new THREE.Matrix4(), v = new THREE.Vector3();
+    movers.forEach((m) => {
+      if (m.o.name.indexOf("car_") !== 0) return;
+      m.o.updateMatrixWorld(true);
+      const inv = new THREE.Matrix4().copy(m.o.matrixWorld).invert(), box = new THREE.Box3(), lit = [];
+      m.o.traverse((c) => {
+        if (!c.isMesh || c.material.isMeshBasicMaterial) return;                 // the flat shadow is not the car
+        m4.multiplyMatrices(inv, c.matrixWorld);
+        const at = c.geometry.attributes.position;
+        for (let i = 0; i < at.count; i++) { v.fromBufferAttribute(at, i).applyMatrix4(m4); box.expandByPoint(v); if (c.material.name === "car_light" && v.x > 0 && v.y > .65 && v.y < 1.35) lit.push(v.clone()); }
+      });
+      if (!lit.length) return;
+      const nose = Math.max(...lit.map((q) => q.x)), front = lit.filter((q) => q.x > nose - .3);
+      const heads = [-1, 1].map((side) => {                  // the model's own headlamps, one on each side
+        const mine = front.filter((q) => q.z * side > 0), c = new THREE.Vector3();
+        mine.forEach((q) => c.add(q));
+        return mine.length ? c.divideScalar(mine.length).setX(nose + .1) : new THREE.Vector3(nose + .1, .85, side * .4);
+      });
+      const half = box.max.z * .68, tails = [-1, 1].map((side) => new THREE.Vector3(box.min.x - .04, .72, side * half));
+      const y = .04 - m.o.position.y, a = box.max.x + .15, b = box.max.x + 8.5;
+      list.push({ m, heads, tails, road: [[a, y, -.9], [b, y, -2.3], [b, y, 2.3], [a, y, -.9], [b, y, 2.3], [a, y, .9]].map((q) => new THREE.Vector3(...q)) });
+    });
+    const points = (n, color, size, stops) => {
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+      const o = new THREE.Points(g, new THREE.PointsMaterial({ color, size, map: glowTex(stops), transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+      o.frustumCulled = false; o.visible = false; scene.add(o); return o;
+    };
+    const head = points(list.length * 2, 0xffdfa8, 1.05, [[0, "rgba(255,255,255,1)"], [.22, "rgba(255,255,255,.55)"], [1, "rgba(255,255,255,0)"]]);
+    const tail = points(list.length * 2, 0xff3a22, .6, [[0, "rgba(255,255,255,1)"], [.3, "rgba(255,255,255,.4)"], [1, "rgba(255,255,255,0)"]]);
+    const beam = paintedTex(256, 128, (x) => {              // along the road to the right, wider and weaker
+      for (let i = 0; i < 256; i++) {
+        const u = i / 255, strength = Math.min(1, u * 6) * Math.pow(1 - u, 1.4), g = x.createLinearGradient(0, 0, 0, 128);
+        g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(.5, "rgba(255,255,255," + strength.toFixed(3) + ")"); g.addColorStop(1, "rgba(255,255,255,0)");
+        x.fillStyle = g; x.fillRect(i, 0, 1, 128);
+      }
+    });
+    const rg = new THREE.BufferGeometry(), uv = new Float32Array(list.length * 12);
+    for (let i = 0; i < list.length; i++) uv.set([0, .22, 1, 0, 1, 1, 0, .22, 1, 1, 0, .78], i * 12);
+    rg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(list.length * 18), 3)); rg.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    const road = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ map: beam, color: 0xffd394, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, fog: false,
+      blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    road.frustumCulled = false; road.visible = false; scene.add(road);
+    NIGHT.cars = { list, head, tail, road, all: [head, tail, road] };
+  }
+  function carLights() {                                     // every frame, just before drawing (make_site.py)
+    const C = NIGHT.cars;
+    if (!C) return;
+    const on = stage(1.2, .35);
+    C.all.forEach((o) => { o.visible = on > 0; });
+    if (!on) return;
+    C.head.material.opacity = .95 * on; C.tail.material.opacity = .85 * on; C.road.material.opacity = .5 * on;
+    const h = C.head.geometry.attributes.position, t = C.tail.geometry.attributes.position, r = C.road.geometry.attributes.position, v = new THREE.Vector3();
+    C.list.forEach((car, i) => {
+      const o = car.m.o, hidden = !o.visible;
+      o.updateMatrixWorld();
+      const put = (attr, at, q) => { v.copy(q).applyMatrix4(o.matrixWorld); attr.setXYZ(at, v.x, hidden ? -50 : v.y, v.z); };
+      car.heads.forEach((q, k) => put(h, i * 2 + k, q)); car.tails.forEach((q, k) => put(t, i * 2 + k, q)); car.road.forEach((q, k) => put(r, i * 6 + k, q));
+    });
+    h.needsUpdate = t.needsUpdate = r.needsUpdate = true;
+  }
+
   function paintRoom(r) {
     const c = NIGHT.rooms.mesh.geometry.attributes.color, v = r.now * stage(r.on, .16);
     for (let i = 0; i < r.count; i++) c.setXYZ(r.at + i, r.tone[0] * v, r.tone[1] * v, r.tone[2] * v);
@@ -2369,7 +2591,7 @@ $("info-btn").addEventListener("click", () => openAbout());
   function nightStep(now) {
     const dt = Math.min(.25, (now - NIGHT.last) / 1000 || 0); NIGHT.last = now; NIGHT.raf = 0;
     const root = scene.getObjectByName("blender");
-    if (root && root !== NIGHT.root) lampThings(root);                  // the model was loaded again
+    if (root && root !== NIGHT.root) { lampThings(root); carThings(); }          // the model was loaded again
     NIGHT.T = reduce ? (NIGHT.on ? END : 0) : NIGHT.on ? Math.min(END, NIGHT.T + dt) : Math.max(0, NIGHT.T - dt * END / BACK);
     if (!reduce) { uNightT.value += dt; if (NIGHT.on && NIGHT.T === END) someoneAtHome(uNightT.value, dt); }
     if (NIGHT.place) {                                      // the moon will stop where the visitor is looking: high on the left of the view
@@ -2383,8 +2605,9 @@ $("info-btn").addEventListener("click", () => openAbout());
   // called while the loading veil is still up: every shader is patched there, so the first press of the moon does not stall
   function nightReady(root) {
     if (!NIGHT.made) moonThings();
-    lampThings(root); nightPaint();
+    lampThings(root); carThings(); nightPaint();
     [NIGHT.disc, NIGHT.halo, NIGHT.cloud, NIGHT.stars, ...NIGHT.spots, ...NIGHT.lamps.children, ...(NIGHT.cinema ? [NIGHT.cinema.wash, ...NIGHT.cinema.heads] : [])].forEach((o) => renderer.initTexture(o.material.map));
+    NIGHT.cars.all.forEach((o) => renderer.initTexture(o.material.map));
     renderer.initTexture(uLampMap.value); renderer.initTexture(NIGHT.rooms.mesh.material.map);
   }
   function setNight(on) {
@@ -2398,7 +2621,7 @@ $("info-btn").addEventListener("click", () => openAbout());
     if (!NIGHT.raf) NIGHT.raf = requestAnimationFrame(nightStep);
   }
 // ---------- opening: the plan is drawn, then the square grows out of it and the camera lands on the roof view ----------
-  // About six seconds, once per visit; a tap skips it. ?intro shows it again, ?nointro never. Nothing is downloaded
+  // About six seconds, on every load, with a small skip button. ?nointro leaves it out. Nothing is downloaded
   // for it: the plan is painted from the square's own measures and from the walls of the loaded model.
   // Growth is one patch on the vertex shaders: the ground spreads from the fountain, what stands on the island rises,
   // then the houses, clockwise. What has not appeared yet waits under the paper.
@@ -2409,10 +2632,11 @@ $("info-btn").addEventListener("click", () => openAbout());
   const uIntro = { value: 1 }, uIntroT = { value: 0 }, uIntroG = { value: 0 };
   const introStep = (a, b) => { const x = clamp((INTRO.t - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); };
   function introWanted() {
+    let quiet = false;                                       // just changed language: no second flight
+    try { quiet = sessionStorage.getItem("kikarQuiet") === "1"; sessionStorage.removeItem("kikarQuiet"); } catch (e) { /* private window */ }
+    if (quiet) return false;
     if (INTRO.done || /[?&]nointro\b/.test(location.search)) return false;
-    if (INTRO_HOLD || /[?&]intro\b/.test(location.search)) return true;
-    if (reduce) return false;
-    try { return !sessionStorage.getItem("kikarIntro"); } catch (e) { return true; }
+    return !!INTRO_HOLD || /[?&]intro\b/.test(location.search) || !reduce;     // asked for less motion: no flight
   }
 
   // the same rise for the solid model and for its ink outline
@@ -2552,7 +2776,9 @@ $("info-btn").addEventListener("click", () => openAbout());
     INTRO.parts.casting.forEach((o) => { o.castShadow = false; });
     renderer.shadowMap.needsUpdate = true;
     document.body.classList.add("intro");
-    const skip = document.createElement("p"); skip.className = "skip"; skip.textContent = "נגיעה לדילוג"; document.body.appendChild(skip); INTRO.parts.skip = skip;
+    const skip = document.createElement("button"); skip.className = "skip"; skip.type = "button";
+    skip.innerHTML = 'דלג<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg>';     // forward points left in Hebrew
+    skip.addEventListener("click", introEnd); document.body.appendChild(skip); INTRO.parts.skip = skip;
     setView("roof"); introFrame(performance.now());
   }
 
@@ -2635,13 +2861,137 @@ $("info-btn").addEventListener("click", () => openAbout());
     water.visible = true; water.scale.set(1, 1, 1); fountain.visible = true; fountain.scale.set(1, 1, 1);
     introOn = false; INTRO.parts = null;
     document.body.classList.remove("intro");
-    setView("roof"); showHint();
-    try { sessionStorage.setItem("kikarIntro", "1"); } catch (e) { /* private window: it will play again */ }
+    setView("roof"); if (!tourMaybe()) showHint();
   }
-  // a tap or a key anywhere skips; the tap itself must not also walk or open something
-  let introSwallow = 0;
-  addEventListener("pointerdown", (e) => { if (!introOn || !INTRO.running) return; e.stopPropagation(); e.preventDefault(); introSwallow = performance.now(); introEnd(); }, true);
-  ["pointerup", "click"].forEach((type) => addEventListener(type, (e) => { if (performance.now() - introSwallow < 450) { e.stopPropagation(); e.preventDefault(); } }, true));
-  addEventListener("keydown", (e) => { if (introOn && INTRO.running) { e.stopPropagation(); introEnd(); } }, true);
+  // until it ends only the skip button answers: a stray touch must not turn the camera or open something
+  ["pointerdown", "pointerup", "click", "wheel"].forEach((type) => addEventListener(type, (e) => {
+    if (introOn && !(e.target.closest && e.target.closest(".skip"))) { e.stopPropagation(); if (e.cancelable) e.preventDefault(); }
+  }, { capture: true, passive: false }));
+  addEventListener("keydown", (e) => { if (introOn && e.key === "Escape") { e.stopPropagation(); introEnd(); } }, true);
+// ---------- a short first visit tour: what there is to do here, one blue tip at a time ----------
+  // It runs once, after the opening, and again from the round button. ?tour shows it again, ?notour never.
+  const TOUR_TOUCH = matchMedia("(pointer: coarse)").matches, TOUR_TAP = TOUR_TOUCH ? "נוגעים" : "לוחצים";
+  const tourMenu = (id) => ({ btn: document.querySelector('[aria-controls="' + id + '"]'), list: $(id) });
+  const TOUR_STEPS = [
+    { title: "ברוכים הבאים לכיכר צינה (דיזנגוף)", text: "שחזור מקורי לפי התוכניות של האדריכלית ג'ניה אוורבוך, שלפיהן נחנכה כיכר צינה ב־1938: מבנה הבניינים, הרחובות, ונקודות עניין היסטוריות מהשנים הראשונות ועד היום.", next: "בואו נתחיל", at: "welcome" },
+    { title: "מצלמות", text: "בוחרים מאיפה להסתכל: מהגג, ממבט על, מתוך הכיכר או מאחורי מכונית.", menu: "cam-menu" },
+    { title: "נקודות מידע", text: "סיפורים, תצלומים וסרטים. בוחרים נושא, והמצלמה לוקחת אתכם אליו.", menu: "spot-menu" },
+    { title: "הסיכות בכיכר", text: TOUR_TAP + " על סיכה, והסיפור שלה נפתח.", at: "pin" },
+    { title: "לסייר בסצנה, כמו בגוגל מפות", text: TOUR_TAP + " על הקרקע, מופיע עיגול, והולכים לשם. "
+        + (TOUR_TOUCH ? "גוררים כדי להסתכל סביב, וצובטים לזום." : "גוררים כדי להסתכל סביב, וגלגלת לזום."), at: "walk" },
+    { title: "ועוד", text: "אודות, שיתוף, יום ולילה, והסיור הזה שוב.", next: "סיום", menu: "quick-list" },
+  ];
+  const TOUR = { on: false, i: 0, el: null, timer: 0, tapTimer: 0, pulse: 0 };
+  // the walking step shows it in the scene itself: a finger taps the ground and the white ring appears there
+  const TOUR_POINTER = TOUR_TOUCH ? '<path d="M22 14a8 8 0 0 1-8 8M18 11v-1a2 2 0 0 0-4 0M14 10V9a2 2 0 0 0-4 0v1M10 9.500V4a2 2 0 0 0-4 0v10M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.800 0-4.500-.860-5.990-2.340l-3.600-3.600a2 2 0 0 1 2.830-2.820L7 15"/>'
+    : '<path d="M5 3l14 8.500-6.200 1.300L10 19z"/>';
+  const TOUR_SPOTS = [[.5, .66], [.28, .6], [.66, .72]];     // parts of the screen under the tip, clear of the buttons
+  let tourRing = null;
+  function tourDemo(show) {
+    clearTimeout(TOUR.tapTimer); cancelAnimationFrame(TOUR.pulse);
+    if (tourRing) tourRing.visible = false;
+    const finger = TOUR.el && TOUR.el.querySelector(".tour-finger");
+    if (!finger) return;
+    finger.hidden = !show;
+    if (!show) return;
+    if (!tourRing) {
+      tourRing = new THREE.Group(); tourRing.userData.keep = true; scene.add(tourRing);
+      tourRing.add(flat(new THREE.RingGeometry(.6, .84, 48), .98), flat(new THREE.CircleGeometry(.6, 48), .3));
+    }
+    let n = 0, size = 1, born = 0;
+    const tap = () => {
+      const [fx, fy] = TOUR_SPOTS[n++ % TOUR_SPOTS.length], x = innerWidth * fx, y = innerHeight * fy, at = groundAt(x, y);
+      finger.classList.remove("down"); finger.style.left = x + "px"; finger.style.top = y + "px";
+      TOUR.tapTimer = setTimeout(() => {
+        finger.classList.add("down");
+        if (at) { tourRing.position.copy(at); tourRing.position.y = .31; size = clamp(rig.position.distanceTo(at) * .05, 1.1, 2.6); born = performance.now(); tourRing.visible = true; }
+        TOUR.tapTimer = setTimeout(tap, reduce ? 4000 : 1700);
+      }, reduce ? 0 : 650);
+    };
+    const pulse = (now) => {
+      const grow = reduce ? 1 : Math.min(1, (now - born) / 220);
+      tourRing.scale.setScalar(size * (.4 + .6 * grow) * (reduce ? 1 : 1 + .12 * Math.sin(now / 110)));
+      TOUR.pulse = requestAnimationFrame(pulse);
+    };
+    tap(); TOUR.pulse = requestAnimationFrame(pulse);
+  }
+  function tourMaybe() {                                      // true when it took over (so the drag hint waits)
+    if (TOUR.on) return true;
+    if (/[?&]notour\b/.test(location.search)) return false;
+    let seen = false;
+    try { seen = localStorage.getItem("kikarTour") === "1"; } catch (e) { /* private window: show it */ }
+    if (seen && !/[?&]tour\b/.test(location.search)) return false;
+    TOUR.on = true; TOUR.timer = setTimeout(tourStart, 500);
+    return true;
+  }
+  function tourStart() {
+    clearTimeout(TOUR.timer);
+    if (TOUR.el) return;
+    closeCard(); if (gyro.on || gyro.listening) gyroOff(); setView("roof");
+    const el = document.createElement("div"); el.className = "tour";
+    el.innerHTML = '<div class="tour-veil"></div><i class="tour-ring" hidden></i><i class="tour-finger" hidden><svg viewBox="0 0 24 24" aria-hidden="true">' + TOUR_POINTER + '</svg></i>'
+      + '<section class="tour-tip" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="tour-title" aria-describedby="tour-text">'
+      + '<h3 id="tour-title"></h3><p id="tour-text"></p><footer><span class="tour-count"></span><button type="button" class="tour-skip">דלג</button><button type="button" class="tour-next"></button></footer></section>';
+    document.body.appendChild(el); document.body.classList.add("touring");
+    TOUR.on = true; TOUR.el = el;
+    el.querySelector(".tour-next").addEventListener("click", () => TOUR.i < TOUR_STEPS.length - 1 ? tourShow(TOUR.i + 1) : tourEnd());
+    el.querySelector(".tour-skip").addEventListener("click", tourEnd);
+    tourShow(0);
+  }
+  function tourShow(i) {
+    const step = TOUR_STEPS[i], el = TOUR.el, q = (s) => el.querySelector(s), tip = q(".tour-tip");
+    TOUR.i = i; closeMenus();
+    document.querySelectorAll(".tour-glow").forEach((o) => o.classList.remove("tour-glow"));
+    q("h3").textContent = step.title; q("p").textContent = step.text;
+    q(".tour-count").textContent = (i + 1) + " מתוך " + TOUR_STEPS.length;
+    q(".tour-next").textContent = step.next || "הבא";
+    if (i < TOUR_STEPS.length - 1) q(".tour-next").insertAdjacentHTML("beforeend", ' <span aria-hidden="true">←</span>');   // onwards points left in Hebrew
+    q(".tour-skip").hidden = i === TOUR_STEPS.length - 1;
+    tourDemo(step.at === "walk");
+    if (step.menu) { const m = tourMenu(step.menu); m.btn.click(); m.btn.classList.add("tour-glow"); }
+    tip.classList.remove("in"); q(".tour-ring").hidden = true;
+    clearTimeout(TOUR.timer);
+    TOUR.timer = setTimeout(() => { tourPlace(); tip.classList.add("in"); tip.focus({ preventScroll: true }); }, step.menu ? 300 : 60);     // after the menu has opened
+  }
+  function tourPlace() {
+    if (!TOUR.el) return;
+    const step = TOUR_STEPS[TOUR.i], tip = TOUR.el.querySelector(".tour-tip"), ring = TOUR.el.querySelector(".tour-ring");
+    const w = tip.offsetWidth, h = tip.offsetHeight, W = innerWidth, H = innerHeight;
+    const put = (left, top, arrow, at) => {
+      left = clamp(left, 12, W - w - 12); top = clamp(top, 10, H - h - 10);
+      tip.style.left = left + "px"; tip.style.top = top + "px"; tip.dataset.arrow = arrow;
+      if (at) tip.style.setProperty("--at", clamp(at(left, top), 22, (arrow === "right" ? h : w) - 22) + "px");
+    };
+    const bar = document.querySelector(".bar").getBoundingClientRect();
+    if (step.at === "welcome") return put((W - w) / 2, Math.min(bar.top, $("quick-btn").getBoundingClientRect().top) - h - 16, "none");   // a little above the buttons
+    if (step.at === "walk") return put((W - w) / 2, Math.min(H * .3 - h / 2, H * .5 - h), "none");        // high enough to leave the ground in sight
+    if (step.at === "pin") {                                 // the pin nearest the middle of the view
+      camera.updateMatrixWorld();
+      const seen = hotspots.map((s) => { const v = s.pos.clone().project(camera); return { z: v.z, x: (v.x + 1) / 2 * W, y: (1 - v.y) / 2 * H }; })
+        .filter((p) => p.z < 1 && p.x > 30 && p.x < W - 30 && p.y > h + 40 && p.y < H - 120)
+        .sort((a, b) => Math.hypot(a.x - W / 2, a.y - H * .55) - Math.hypot(b.x - W / 2, b.y - H * .55));
+      const p = seen[0];
+      if (!p) return put((W - w) / 2, bar.top - h - 18, "none");
+      ring.hidden = false; ring.style.left = p.x + "px"; ring.style.top = p.y + "px";
+      return put(p.x - w / 2, p.y - h - 40, "down", (left) => p.x - left);
+    }
+    const m = tourMenu(step.menu), list = m.list.getBoundingClientRect(), btn = m.btn.getBoundingClientRect();
+    if (step.menu === "quick-list") {                        // beside the round buttons
+      const circle = m.list.querySelector("i").getBoundingClientRect(), mid = list.top + list.height / 2;
+      return put(circle.left - w - 16, mid - h / 2, "right", (left, top) => mid - top);
+    }
+    put(btn.left + btn.width / 2 - w / 2, list.top - h - 16, "down", (left) => btn.left + btn.width / 2 - left);
+  }
+  function tourEnd() {
+    clearTimeout(TOUR.timer); closeMenus(); tourDemo(false);
+    document.querySelectorAll(".tour-glow").forEach((o) => o.classList.remove("tour-glow"));
+    if (TOUR.el) TOUR.el.remove();
+    TOUR.el = null; TOUR.on = false; document.body.classList.remove("touring");
+    try { localStorage.setItem("kikarTour", "1"); } catch (e) { /* private window: it will show again */ }
+    showHint();
+  }
+  addEventListener("resize", () => setTimeout(tourPlace, 120));
+  addEventListener("keydown", (e) => { if (TOUR.el && e.key === "Escape") { e.stopPropagation(); tourEnd(); } }, true);
+  $("quick-tour").addEventListener("click", () => setTimeout(tourStart, 0));   // after the menu has closed
 requestAnimationFrame(frame);
 })();

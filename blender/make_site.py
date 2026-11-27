@@ -95,9 +95,16 @@ html = rep(html, "family=Assistant:wght@400;600;700", "family=Assistant:wght@400
 html = rep(html, "family=Frank+Ruhl+Libre:wght@500;700", "family=Frank+Ruhl+Libre:wght@500;700;900")
 FA = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/"      # solid LinkedIn / WhatsApp marks in "about"
 html = rep(html, "</head>", '<link rel="stylesheet" href="%sfontawesome.min.css">\n<link rel="stylesheet" href="%sbrands.min.css">\n</head>' % (FA, FA))
+# the project's name: Zina Square, which is Dizengoff Square today
+NAME = "כיכר צינה (דיזנגוף)"
+html = rep(html, "<title>כיכר דיזנגוף 1940</title>", "<title>%s 1940</title>" % NAME)
+html = rep(html, 'property="og:title" content="כיכר דיזנגוף 1940"', 'property="og:title" content="%s 1940"' % NAME)
+html, n = re.subn("(שחזור תלת־ממדי מסוגנן של |סקיצה תלת־ממדית של )כיכר דיזנגוף", lambda m: m.group(1) + NAME, html)
+assert n == 3, ("descriptions with the old name", n)
+html = rep(html, ">כיכר צינה דיזנגוף<small>", ">%s<small>" % NAME)
 html = rep(html, '<div dir="rtl">', '''<div dir="rtl">
   <div class="loading" id="loading" role="status">
-    <div class="plate">כיכר צינה דיזנגוף<small>שחזור תלת־ממד 1940</small></div>
+    <div class="plate">כיכר צינה (דיזנגוף)<small>שחזור תלת־ממד 1940</small></div>
     <div class="load-track"><i id="load-bar"></i></div>
     <p><span id="load-text">טוענים את הכיכר</span> <span id="load-pct" dir="ltr">0%</span></p>
     <button class="pill" id="load-again" hidden>לנסות שוב</button>
@@ -417,10 +424,15 @@ js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry 
     } catch (e) { /* nothing published yet */ }
     setTimeout(poll, 4000);
   })();
-  """.replace("__GRADE__", GRADE) + web("shadows.js") + web("people_walk.js") + web("paint.js") + web("walk.js") + web("ground.js") + web("signposts.js") + web("opening.js") + web("zina.js") + web("levels.js") + web("genia.js") + web("captions.js").replace("__CAPTIONS__", captions()) + web("cinema.js") + web("about.js") + web("share.js") + web("night.js") + web("intro.js") + js[i:]
+  """.replace("__GRADE__", GRADE) + web("shadows.js") + web("people_walk.js") + web("paint.js") + web("walk.js") + web("ground.js") + web("signposts.js") + web("opening.js") + web("zina.js") + web("levels.js") + web("cards_en.js") + web("genia.js") + web("captions.js").replace("__CAPTIONS__", captions()) + web("cinema.js") + web("about.js") + web("share.js") + web("night.js") + web("intro.js") + web("tour.js") + js[i:]
 # the opening (web/intro.js) moves the camera before it is applied, and hides what has not appeared just before drawing
 js = rep(js, "    updateCamera(dt);\n", "    introFrame(now);\n    updateCamera(dt);\n")
-js = rep(js, "    renderer.render(scene, camera);\n    requestAnimationFrame(frame);", "    introShow();\n    renderer.render(scene, camera);\n    requestAnimationFrame(frame);")
+js = rep(js, "    renderer.render(scene, camera);\n    requestAnimationFrame(frame);", "    introShow();\n    carLights();\n    renderer.render(scene, camera);\n    requestAnimationFrame(frame);")
+# two languages (web/lang.js): it has to exist before anything is painted
+js = rep(js, "  const $ = (id) => document.getElementById(id);\n", "  const $ = (id) => document.getElementById(id);\n" + web("lang.js"))
+js = rep(js, 'x.direction = "rtl";', 'x.direction = LANG_EN ? "ltr" : "rtl";')
+js = rep(js, "map: groundTex(a.name),", "map: groundTex(tr(a.name)),")
+js = rep(js, "labelTex(...LABELS[b.key])", "labelTex(...LABELS[b.key].map(tr))")
 # sky: panorama made from the same HDRI as in Blender (sky.py writes sky.jpg and sky.json)
 haze = json.load(open(os.path.join(OUT, "sky.json")))["haze"]
 js = rep(js, "const HAZE = 0xe6e2d3;", "const HAZE = %s;" % haze)

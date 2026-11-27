@@ -235,6 +235,71 @@
     NIGHT.cinema = { all, heads, wash, lens };
   }
 
+  // ---------- the moving cars: two warm headlamps with their light on the road, and two red lamps behind ----------
+  // All of them together are three draw calls, moved each frame with their cars. The cart and parked cars stay dark.
+  function carThings() {
+    if (NIGHT.cars) NIGHT.cars.all.forEach((o) => scene.remove(o));
+    const list = [], m4 = new THREE.Matrix4(), v = new THREE.Vector3();
+    movers.forEach((m) => {
+      if (m.o.name.indexOf("car_") !== 0) return;
+      m.o.updateMatrixWorld(true);
+      const inv = new THREE.Matrix4().copy(m.o.matrixWorld).invert(), box = new THREE.Box3(), lit = [];
+      m.o.traverse((c) => {
+        if (!c.isMesh || c.material.isMeshBasicMaterial) return;                 // the flat shadow is not the car
+        m4.multiplyMatrices(inv, c.matrixWorld);
+        const at = c.geometry.attributes.position;
+        for (let i = 0; i < at.count; i++) { v.fromBufferAttribute(at, i).applyMatrix4(m4); box.expandByPoint(v); if (c.material.name === "car_light" && v.x > 0 && v.y > .65 && v.y < 1.35) lit.push(v.clone()); }
+      });
+      if (!lit.length) return;
+      const nose = Math.max(...lit.map((q) => q.x)), front = lit.filter((q) => q.x > nose - .3);
+      const heads = [-1, 1].map((side) => {                  // the model's own headlamps, one on each side
+        const mine = front.filter((q) => q.z * side > 0), c = new THREE.Vector3();
+        mine.forEach((q) => c.add(q));
+        return mine.length ? c.divideScalar(mine.length).setX(nose + .1) : new THREE.Vector3(nose + .1, .85, side * .4);
+      });
+      const half = box.max.z * .68, tails = [-1, 1].map((side) => new THREE.Vector3(box.min.x - .04, .72, side * half));
+      const y = .04 - m.o.position.y, a = box.max.x + .15, b = box.max.x + 8.5;
+      list.push({ m, heads, tails, road: [[a, y, -.9], [b, y, -2.3], [b, y, 2.3], [a, y, -.9], [b, y, 2.3], [a, y, .9]].map((q) => new THREE.Vector3(...q)) });
+    });
+    const points = (n, color, size, stops) => {
+      const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(n * 3), 3));
+      const o = new THREE.Points(g, new THREE.PointsMaterial({ color, size, map: glowTex(stops), transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+      o.frustumCulled = false; o.visible = false; scene.add(o); return o;
+    };
+    const head = points(list.length * 2, 0xffdfa8, 1.05, [[0, "rgba(255,255,255,1)"], [.22, "rgba(255,255,255,.55)"], [1, "rgba(255,255,255,0)"]]);
+    const tail = points(list.length * 2, 0xff3a22, .6, [[0, "rgba(255,255,255,1)"], [.3, "rgba(255,255,255,.4)"], [1, "rgba(255,255,255,0)"]]);
+    const beam = paintedTex(256, 128, (x) => {              // along the road to the right, wider and weaker
+      for (let i = 0; i < 256; i++) {
+        const u = i / 255, strength = Math.min(1, u * 6) * Math.pow(1 - u, 1.4), g = x.createLinearGradient(0, 0, 0, 128);
+        g.addColorStop(0, "rgba(255,255,255,0)"); g.addColorStop(.5, "rgba(255,255,255," + strength.toFixed(3) + ")"); g.addColorStop(1, "rgba(255,255,255,0)");
+        x.fillStyle = g; x.fillRect(i, 0, 1, 128);
+      }
+    });
+    const rg = new THREE.BufferGeometry(), uv = new Float32Array(list.length * 12);
+    for (let i = 0; i < list.length; i++) uv.set([0, .22, 1, 0, 1, 1, 0, .22, 1, 1, 0, .78], i * 12);
+    rg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(list.length * 18), 3)); rg.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+    const road = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ map: beam, color: 0xffd394, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, fog: false,
+      blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    road.frustumCulled = false; road.visible = false; scene.add(road);
+    NIGHT.cars = { list, head, tail, road, all: [head, tail, road] };
+  }
+  function carLights() {                                     // every frame, just before drawing (make_site.py)
+    const C = NIGHT.cars;
+    if (!C) return;
+    const on = stage(1.2, .35);
+    C.all.forEach((o) => { o.visible = on > 0; });
+    if (!on) return;
+    C.head.material.opacity = .95 * on; C.tail.material.opacity = .85 * on; C.road.material.opacity = .5 * on;
+    const h = C.head.geometry.attributes.position, t = C.tail.geometry.attributes.position, r = C.road.geometry.attributes.position, v = new THREE.Vector3();
+    C.list.forEach((car, i) => {
+      const o = car.m.o, hidden = !o.visible;
+      o.updateMatrixWorld();
+      const put = (attr, at, q) => { v.copy(q).applyMatrix4(o.matrixWorld); attr.setXYZ(at, v.x, hidden ? -50 : v.y, v.z); };
+      car.heads.forEach((q, k) => put(h, i * 2 + k, q)); car.tails.forEach((q, k) => put(t, i * 2 + k, q)); car.road.forEach((q, k) => put(r, i * 6 + k, q));
+    });
+    h.needsUpdate = t.needsUpdate = r.needsUpdate = true;
+  }
+
   function paintRoom(r) {
     const c = NIGHT.rooms.mesh.geometry.attributes.color, v = r.now * stage(r.on, .16);
     for (let i = 0; i < r.count; i++) c.setXYZ(r.at + i, r.tone[0] * v, r.tone[1] * v, r.tone[2] * v);
@@ -356,7 +421,7 @@
   function nightStep(now) {
     const dt = Math.min(.25, (now - NIGHT.last) / 1000 || 0); NIGHT.last = now; NIGHT.raf = 0;
     const root = scene.getObjectByName("blender");
-    if (root && root !== NIGHT.root) lampThings(root);                  // the model was loaded again
+    if (root && root !== NIGHT.root) { lampThings(root); carThings(); }          // the model was loaded again
     NIGHT.T = reduce ? (NIGHT.on ? END : 0) : NIGHT.on ? Math.min(END, NIGHT.T + dt) : Math.max(0, NIGHT.T - dt * END / BACK);
     if (!reduce) { uNightT.value += dt; if (NIGHT.on && NIGHT.T === END) someoneAtHome(uNightT.value, dt); }
     if (NIGHT.place) {                                      // the moon will stop where the visitor is looking: high on the left of the view
@@ -370,8 +435,9 @@
   // called while the loading veil is still up: every shader is patched there, so the first press of the moon does not stall
   function nightReady(root) {
     if (!NIGHT.made) moonThings();
-    lampThings(root); nightPaint();
+    lampThings(root); carThings(); nightPaint();
     [NIGHT.disc, NIGHT.halo, NIGHT.cloud, NIGHT.stars, ...NIGHT.spots, ...NIGHT.lamps.children, ...(NIGHT.cinema ? [NIGHT.cinema.wash, ...NIGHT.cinema.heads] : [])].forEach((o) => renderer.initTexture(o.material.map));
+    NIGHT.cars.all.forEach((o) => renderer.initTexture(o.material.map));
     renderer.initTexture(uLampMap.value); renderer.initTexture(NIGHT.rooms.mesh.material.map);
   }
   function setNight(on) {

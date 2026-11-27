@@ -37,7 +37,7 @@
     renderer.compile(scene, camera); await painted(); await painted();
     progress(1); shown = true;
     veilLoad.classList.add("done"); introStart();
-    setTimeout(() => { veilLoad.hidden = true; if (!introOn) showHint(); }, 700);
+    setTimeout(() => { veilLoad.hidden = true; if (!introOn && !tourMaybe()) showHint(); }, 700);
   }
   function loadFailed(e) {
     console.error(e);

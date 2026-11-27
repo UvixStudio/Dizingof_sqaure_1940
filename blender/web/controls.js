@@ -76,7 +76,7 @@
       e.preventDefault(); all[(to + all.length) % all.length].focus({ preventScroll: true });
     });
   });
-  addEventListener("pointerdown", (e) => { if (!e.target.closest(".drop, .quick")) closeMenus(); }, true);
+  addEventListener("pointerdown", (e) => { if (!e.target.closest(".drop, .quick, .tour")) closeMenus(); }, true);
   const hintEl = $("hint"); let hintTimer = 0, hintSaid = "";
   // "how to look around" is a small moving hand (or mouse), shown until the first drag or zoom. Other messages are text
   const LOOKING = new Set([HINT, HINT_TOP, HINT_RIDE]);
@@ -92,7 +92,7 @@
   }
   canvas.addEventListener("pointermove", () => { if (!gestureDone && (ptrs.size > 1 || (ptrs.size && tap && tap.moved > 8))) endGesture(); });
   canvas.addEventListener("wheel", endGesture, { passive: true });
-  $("lang-btn").addEventListener("click", () => { hintEl.textContent = "הגרסה באנגלית בדרך"; showHint(); });
+  $("lang-btn").addEventListener("click", switchLang);        // web/lang.js
   // day / night (web/night.js): the icon shows where a press will lead
   $("quick-night").addEventListener("click", (e) => {
     const b = e.currentTarget, night = b.getAttribute("aria-checked") !== "true";

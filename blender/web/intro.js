@@ -1,5 +1,5 @@
 // ---------- opening: the plan is drawn, then the square grows out of it and the camera lands on the roof view ----------
-  // About six seconds, once per visit; a tap skips it. ?intro shows it again, ?nointro never. Nothing is downloaded
+  // About six seconds, on every load, with a small skip button. ?nointro leaves it out. Nothing is downloaded
   // for it: the plan is painted from the square's own measures and from the walls of the loaded model.
   // Growth is one patch on the vertex shaders: the ground spreads from the fountain, what stands on the island rises,
   // then the houses, clockwise. What has not appeared yet waits under the paper.
@@ -10,10 +10,11 @@
   const uIntro = { value: 1 }, uIntroT = { value: 0 }, uIntroG = { value: 0 };
   const introStep = (a, b) => { const x = clamp((INTRO.t - a) / (b - a), 0, 1); return x * x * (3 - 2 * x); };
   function introWanted() {
+    let quiet = false;                                       // just changed language: no second flight
+    try { quiet = sessionStorage.getItem("kikarQuiet") === "1"; sessionStorage.removeItem("kikarQuiet"); } catch (e) { /* private window */ }
+    if (quiet) return false;
     if (INTRO.done || /[?&]nointro\b/.test(location.search)) return false;
-    if (INTRO_HOLD || /[?&]intro\b/.test(location.search)) return true;
-    if (reduce) return false;
-    try { return !sessionStorage.getItem("kikarIntro"); } catch (e) { return true; }
+    return !!INTRO_HOLD || /[?&]intro\b/.test(location.search) || !reduce;     // asked for less motion: no flight
   }
 
   // the same rise for the solid model and for its ink outline
@@ -153,7 +154,9 @@
     INTRO.parts.casting.forEach((o) => { o.castShadow = false; });
     renderer.shadowMap.needsUpdate = true;
     document.body.classList.add("intro");
-    const skip = document.createElement("p"); skip.className = "skip"; skip.textContent = "נגיעה לדילוג"; document.body.appendChild(skip); INTRO.parts.skip = skip;
+    const skip = document.createElement("button"); skip.className = "skip"; skip.type = "button";
+    skip.innerHTML = 'דלג<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6l-6 6 6 6"/></svg>';     // forward points left in Hebrew
+    skip.addEventListener("click", introEnd); document.body.appendChild(skip); INTRO.parts.skip = skip;
     setView("roof"); introFrame(performance.now());
   }
 
@@ -236,11 +239,10 @@
     water.visible = true; water.scale.set(1, 1, 1); fountain.visible = true; fountain.scale.set(1, 1, 1);
     introOn = false; INTRO.parts = null;
     document.body.classList.remove("intro");
-    setView("roof"); showHint();
-    try { sessionStorage.setItem("kikarIntro", "1"); } catch (e) { /* private window: it will play again */ }
+    setView("roof"); if (!tourMaybe()) showHint();
   }
-  // a tap or a key anywhere skips; the tap itself must not also walk or open something
-  let introSwallow = 0;
-  addEventListener("pointerdown", (e) => { if (!introOn || !INTRO.running) return; e.stopPropagation(); e.preventDefault(); introSwallow = performance.now(); introEnd(); }, true);
-  ["pointerup", "click"].forEach((type) => addEventListener(type, (e) => { if (performance.now() - introSwallow < 450) { e.stopPropagation(); e.preventDefault(); } }, true));
-  addEventListener("keydown", (e) => { if (introOn && INTRO.running) { e.stopPropagation(); introEnd(); } }, true);
+  // until it ends only the skip button answers: a stray touch must not turn the camera or open something
+  ["pointerdown", "pointerup", "click", "wheel"].forEach((type) => addEventListener(type, (e) => {
+    if (introOn && !(e.target.closest && e.target.closest(".skip"))) { e.stopPropagation(); if (e.cancelable) e.preventDefault(); }
+  }, { capture: true, passive: false }));
+  addEventListener("keydown", (e) => { if (introOn && e.key === "Escape") { e.stopPropagation(); introEnd(); } }, true);
