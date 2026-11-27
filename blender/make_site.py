@@ -280,6 +280,7 @@ js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry 
       shadows(g.scene);
       paint(g.scene);
       nightReady(g.scene);
+      introReady(g.scene);
       walkingFigures(t);
       reveal();
     }, loadFailed);
@@ -416,7 +417,10 @@ js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry 
     } catch (e) { /* nothing published yet */ }
     setTimeout(poll, 4000);
   })();
-  """.replace("__GRADE__", GRADE) + web("shadows.js") + web("people_walk.js") + web("paint.js") + web("walk.js") + web("ground.js") + web("signposts.js") + web("opening.js") + web("zina.js") + web("levels.js") + web("genia.js") + web("captions.js").replace("__CAPTIONS__", captions()) + web("cinema.js") + web("about.js") + web("share.js") + web("night.js") + js[i:]
+  """.replace("__GRADE__", GRADE) + web("shadows.js") + web("people_walk.js") + web("paint.js") + web("walk.js") + web("ground.js") + web("signposts.js") + web("opening.js") + web("zina.js") + web("levels.js") + web("genia.js") + web("captions.js").replace("__CAPTIONS__", captions()) + web("cinema.js") + web("about.js") + web("share.js") + web("night.js") + web("intro.js") + js[i:]
+# the opening (web/intro.js) moves the camera before it is applied, and hides what has not appeared just before drawing
+js = rep(js, "    updateCamera(dt);\n", "    introFrame(now);\n    updateCamera(dt);\n")
+js = rep(js, "    renderer.render(scene, camera);\n    requestAnimationFrame(frame);", "    introShow();\n    renderer.render(scene, camera);\n    requestAnimationFrame(frame);")
 # sky: panorama made from the same HDRI as in Blender (sky.py writes sky.jpg and sky.json)
 haze = json.load(open(os.path.join(OUT, "sky.json")))["haze"]
 js = rep(js, "const HAZE = 0xe6e2d3;", "const HAZE = %s;" % haze)

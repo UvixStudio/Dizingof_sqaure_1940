@@ -36,7 +36,8 @@
     progress(.98, "מדליקים את האור"); await painted();
     renderer.compile(scene, camera); await painted(); await painted();
     progress(1); shown = true;
-    veilLoad.classList.add("done"); setTimeout(() => { veilLoad.hidden = true; showHint(); }, 700);
+    veilLoad.classList.add("done"); introStart();
+    setTimeout(() => { veilLoad.hidden = true; if (!introOn) showHint(); }, 700);
   }
   function loadFailed(e) {
     console.error(e);

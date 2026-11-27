@@ -192,6 +192,11 @@ body.night .lang-btn { color: #fff; text-shadow: 0 0 8px rgba(0,0,0,.65); }     
 .card .rights li { margin-bottom: 5px; }
 .card .rights a { color: inherit; text-decoration: underline; }
 
+/* during the opening only the title is there; the rest arrives with the square (web/intro.js) */
+.bar, .quick, .lang-btn { transition: opacity .6s ease; }
+body.intro .bar, body.intro .quick, body.intro .lang-btn, body.intro .gesture, body.intro .hint { opacity: 0 !important; visibility: hidden; pointer-events: none; }
+.skip { position: fixed; z-index: 8; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); transform: translateX(-50%); margin: 0; font: 500 .85rem/1 var(--body); color: var(--blue); opacity: .65; pointer-events: none; white-space: nowrap; }
+
 /* the invitation to share, at the end of "about" */
 .card .share-end { margin: 18px 0 6px; padding: 14px 12px 16px; border: 1px solid var(--gold); border-radius: 12px; text-align: center; }
 .card .share-end h3 { margin: 0 0 4px; }

@@ -20,7 +20,7 @@
   const meter = metered ? document.body.appendChild(document.createElement("div")) : null;
   if (meter) meter.className = "fps";
   function adapt(ms, now) {
-    if (now < pace.from || ms > 250) return;                          // loading, or a tab in the background
+    if (introOn || now < pace.from || ms > 250) return;                          // loading, or a tab in the background
     pace.sum += ms; if (++pace.n < 40) return;
     const avg = pace.sum / pace.n; pace.sum = pace.n = 0;
     pace.slow = avg > 24 ? pace.slow + 1 : 0;
