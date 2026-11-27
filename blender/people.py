@@ -147,7 +147,7 @@ def pram(bm, x, y=0.0, col="white"):
     limb(bm, (x - 0.55, y - 0.19, 0.98), (x - 0.55, y + 0.19, 0.98), 0.016, 0.016, "black", 5)
 
 
-def bicycle(bm, look, s=1.0, col="black"):
+def bicycle(bm, look, s=1.0, col="black", rider=True):
     child = look["kind"] in ("boy", "girl")
     k = 0.68 if child else 1.0
     r, wb = 0.33 * k, 0.55 * k
@@ -159,6 +159,8 @@ def bicycle(bm, look, s=1.0, col="black"):
     limb(bm, (bar[0], -0.24 * k, bar[2] + 0.08 * k), (bar[0], 0.24 * k, bar[2] + 0.08 * k), 0.014, 0.014, "metal", 5)
     limb(bm, bar, (bar[0], 0, bar[2] + 0.08 * k), 0.014, 0.014, "metal", 4)
     block(bm, (seat[0], 0, seat[2] + 0.03), (0.22 * k, 0.1 * k, 0.05 * k), "brown")
+    if not rider:
+        return
     hip = Vector((seat[0], 0, seat[2] + 0.12 * k))
     for side, ph in ((-0.1, 0.0), (0.1, math.pi)):
         pedal = Vector((crank[0] + 0.13 * k * math.cos(ph + 0.6), side * k * 1.5, crank[2] + 0.13 * k * math.sin(ph + 0.6)))
@@ -176,8 +178,9 @@ def bicycle(bm, look, s=1.0, col="black"):
     head(bm, (top.x + 0.07 * k, 0, top.z + 0.2 * k), look, k * 1.08 if child else 1.0)
 
 
-def accordionist(bm, look):
-    person(bm, look, stride=0.05, hands=((0.27, -0.27, 1.12), (0.27, 0.27, 1.16)))
+def accordionist(bm, look, body=True):
+    if body:
+        person(bm, look, stride=0.05, hands=((0.27, -0.27, 1.12), (0.27, 0.27, 1.16)))
     for i in range(9):                                                         # bellows
         y = -0.18 + i * 0.045
         block(bm, (0.24, y, 1.13), (0.15 + 0.03 * (i % 2), 0.045, 0.3 + 0.025 * (i % 2)), "cream" if i % 2 else "black")
@@ -232,6 +235,27 @@ def sitters(M, count=8, seed=5):
     R = random.Random(seed)
     return [make_mesh("sit_%d" % i, lambda bm, i=i: person(bm, look(R, ("woman", "man", "woman", "girl")[i % 4]), pose="sit"), M)
             for i in range(count)]
+
+
+def genia(M):
+    """Genia Averbuch on her bench, after the portrait on her card: fair curls, a light coat with a wide
+    collar over a dark top, hands in her lap, smiling. Colours are interpretation (the photo is B&W)."""
+    def draw(bm):
+        person(bm, {"kind": "woman", "skin": "skin_a", "hair": "blonde", "top": "beige", "bottom": "beige"}, pose="sit")
+        hz = 0.58 + 0.76 + 0.02                                    # centre of the head, as person() places it
+        for x, y, z, r in ((0.045, 0.0, 0.125, 0.062), (0.02, 0.075, 0.105, 0.058), (0.02, -0.075, 0.105, 0.058),
+                           (-0.035, 0.115, 0.04, 0.062), (-0.035, -0.115, 0.04, 0.062), (-0.055, 0.12, -0.05, 0.058),
+                           (-0.055, -0.12, -0.05, 0.058), (-0.1, 0.07, -0.095, 0.062), (-0.1, -0.07, -0.095, 0.062),
+                           (-0.12, 0.0, -0.06, 0.07), (-0.075, 0.045, 0.1, 0.062), (-0.075, -0.045, 0.1, 0.062)):
+            ball(bm, (0.01 + x, y, hz + z), r, "blonde")          # curls, up from the forehead and round the nape
+        for side in (-1, 1):
+            block(bm, (0.121, side * 0.038, hz + 0.018), (0.008, 0.022, 0.012), "brown")      # eyes
+            block(bm, (0.119, side * 0.04, hz + 0.047), (0.008, 0.036, 0.007), "hair_brown")  # brows
+            limb(bm, (0.15, side * 0.025, 1.04), (0.1, side * 0.135, 1.115), 0.022, 0.05, "cream", 4)   # collar
+        block(bm, (0.117, 0.0, hz - 0.042), (0.008, 0.05, 0.012), "rose")                      # smile
+        block(bm, (0.135, 0.0, 1.05), (0.02, 0.07, 0.085), "charcoal")                         # the dark top at the neck
+        ball(bm, (0.15, 0.0, 0.96), 0.022, "brown")                                            # button
+    return make_mesh("genia", draw, M)
 
 
 def populate(M, c):

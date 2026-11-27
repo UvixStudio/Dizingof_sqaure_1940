@@ -4,7 +4,7 @@ Esther's banner and big poster, advertising columns. Run by build_square.py with
 Evidence: awnings were NOT everywhere (postcard, MAT-22292, B9-48, kikar_norz show a few, pale cloth);
 ECKMANN awnings, the Bergner banner and DREAMLAND are on the Esther postcard. Which shop stood where,
 the colours and the generic trades are interpretation."""
-import bmesh, math, os, random, runpy
+import bmesh, json, math, os, random, runpy
 from mathutils import Vector
 
 S = runpy.run_path(os.path.join(ROOT, "blender", "signs_data.py"))
@@ -19,7 +19,16 @@ FIXED = {
 }
 FILLER = ["grocery", "bakery", "books", "shoes", "hats", "barber", "watch", "textile", "photo", "candy", "deli"]
 CAFES = {"B": (-1, -2), "E": (1,)}
-NAMES = ["signs", "poster", "aw_white", "aw_cream", "aw_green", "aw_terra", "aw_blue", "iron", "table", "wood"]
+NAMES = ["signs", "poster", "aw_white", "aw_cream", "aw_green", "aw_terra", "aw_blue", "iron", "table", "wood",
+         "cine_sign", "cine_shadow", "bronze", "poster_four"]
+# trades without a bay of their own in the first plan get one that had no board
+# bays whose picture is drawn mirrored (none: neighbours never share a picture)
+MIRROR = set()
+# drawn shopfronts (make_shopfronts.py): which bay shows which picture, from the catalogue
+with open(os.path.join(ROOT, "assets", "shopfronts", "shop_catalog.json"), encoding="utf-8-sig") as f:
+    FRONTS = {(bay[0], int(bay[1:])): "shop_" + shop["number"] for shop in json.load(f) for bay in shop["model_bays"]
+              if os.path.isfile(os.path.join(ROOT, "blender", "tex", "shops", shop["number"] + ".jpg"))}
+NAMES += sorted(set(FRONTS.values()))
 IDX = {n: i for i, n in enumerate(NAMES)}
 
 
@@ -56,12 +65,30 @@ def facade_sheet(bm, rec, ch, s0, s1, z0, z1, inset, mat, cell):
         quad(bm, rec, pts, mat, uvs)
 
 
+def swatch(board):
+    """A patch of plain colour in the sign atlas, for cloth that matches a sign: the board's own background, beside
+    the lettering. A nearly white board would not show against the white stripes, so it takes the brown one."""
+    bg = S["BOARDS"][board][2] if board in S["BOARDS"] else S["NAMED"][board][2][0]
+    if min(bg) >= 214:
+        board = "A3"
+    x, y, w, h = S["CELLS"][board]
+    u0, u1 = (x + 22) / S["ATLAS"], (x + 40) / S["ATLAS"]
+    v0, v1 = 1 - (y + h / 2 + 8) / S["ATLAS_H"], 1 - (y + h / 2 - 8) / S["ATLAS_H"]
+    return [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
+
+
 def awning(bm, rec, ch, s0, s1, top_z, style):
     """Sloping cloth with a short valance; striped cloth is cut into 30 cm gores."""
-    if style.startswith("stripe_"):
+    cloth_uv = swatch(style[5:]) if style.startswith("sign:") else None
+    if style.startswith("stripe_") or cloth_uv:
         n = max(2, int((s1 - s0) / 0.3))
+        if cloth_uv:
+            colour, first = IDX["signs"], 0                   # coloured at both edges
+            n += 1 - n % 2
+        else:
+            colour, first = IDX["aw_" + style[7:]], 1
         parts = [(s0 + (s1 - s0) * i / n, s0 + (s1 - s0) * (i + 1) / n,
-                  IDX["aw_" + style[7:]] if i % 2 else IDX["aw_white"]) for i in range(n)]
+                  colour if i % 2 == first else IDX["aw_white"]) for i in range(n)]
     else:
         parts = [(s0, s1, IDX.get(style, IDX["aw_white"]))]
     lettered = style.startswith("eck_")
@@ -85,8 +112,9 @@ def awning(bm, rec, ch, s0, s1, top_z, style):
                 quad(bm, rec, [la, lb, tb, ta], IDX["signs"], [(uc, v0), (ud, v0), (ud, v1), (uc, v1)])
                 quad(bm, rec, [va, vb, lb, la], IDX["aw_white"])
             else:
-                quad(bm, rec, [la, lb, tb, ta], mat)
-                quad(bm, rec, [va, vb, lb, la], mat)
+                uvs = cloth_uv if mat == IDX["signs"] else None
+                quad(bm, rec, [la, lb, tb, ta], mat, uvs)
+                quad(bm, rec, [va, vb, lb, la], mat, uvs)
 
 
 def prism(bm, centre, r, z0, z1, mat, seg=10, r1=None):
@@ -99,7 +127,7 @@ def prism(bm, centre, r, z0, z1, mat, seg=10, r1=None):
     bm.faces.new(hi).material_index = mat
 
 
-def cafe(bm, rec, ch, s0, s1, R):
+def cafe(bm, rec, ch, s0, s1, R, board=None):
     """Pavement tables: round white top, two or three wooden chairs, now and then a parasol."""
     s, k = s0 + 0.9, 0
     while s < s1 - 0.5:
@@ -122,10 +150,46 @@ def cafe(bm, rec, ch, s0, s1, R):
             for i in range(12):
                 a, b = 6.283 * i / 12, 6.283 * (i + 1) / 12
                 cloth = IDX["aw_white"] if i % 2 == 0 else IDX["aw_terra" if k % 4 == 0 else "aw_green"]
+                uvs = None
+                if board and i % 2:                           # the cafe's own colour, as on its sign
+                    cloth, uvs = IDX["signs"], swatch(board)[:3]
                 quad(bm, rec, [(p.x + 1.05 * math.cos(a), p.y + 1.05 * math.sin(a), 2.18),
-                               (p.x + 1.05 * math.cos(b), p.y + 1.05 * math.sin(b), 2.18), tip], cloth)
+                               (p.x + 1.05 * math.cos(b), p.y + 1.05 * math.sin(b), 2.18), tip], cloth, uvs)
         s += 2.3
         k += 1
+
+
+def bar(bm, rec, ch, s0, s1, z0, z1, near, far, mat):
+    """A solid strip standing off the wall (the metal frame)."""
+    facade_sheet(bm, rec, ch, s0, s1, z0, z1, -far, mat, (0, 0, 0.001, 0.001))
+    ends = [(ch.at(s, -near)[0], ch.at(s, -far)[0]) for s in (s0, s1)]
+    for z in (z0, z1):
+        quad(bm, rec, [(ends[0][0].x, ends[0][0].y, z), (ends[1][0].x, ends[1][0].y, z),
+                       (ends[1][1].x, ends[1][1].y, z), (ends[0][1].x, ends[0][1].y, z)], mat)
+    for a, b in ends:
+        quad(bm, rec, [(a.x, a.y, z0), (b.x, b.y, z0), (b.x, b.y, z1), (a.x, a.y, z1)], mat)
+
+
+def cinema_front(bm, rec, ch, mid, parapet):
+    """The tower of the cinema: the metal name sign with its painted shadow, and under it a framed poster.
+    A design of this reconstruction; the 1940 postcard shows upright red letters here."""
+    high = 7.4
+    wide = high * 898 / 1426
+    left = mid - wide * 377 / 898                            # the sign's two posts sit in the middle of the wall
+    top = parapet + 0.9                                      # the scroll rises above the roof line
+    pad = 80 * high / 1426                                   # room for the soft edge (make_cinema_sign.PAD)
+    whole = (0, 0, 1, 1)
+    facade_sheet(bm, rec, ch, left - pad + 0.09, left + wide + pad + 0.09, top - high - pad - 0.12, top + pad - 0.12, -0.03,
+                 IDX["cine_shadow"], whole)
+    facade_sheet(bm, rec, ch, left, left + wide, top - high, top, -0.17, IDX["cine_sign"], whole)
+    tall = 4.3
+    half = tall * 747 / 1075 / 2
+    z1 = top - high - 0.55
+    z0, a, b, w = z1 - tall, mid - half, mid + half, 0.14
+    facade_sheet(bm, rec, ch, a, b, z0, z1, -0.07, IDX["poster_four"], whole)
+    for s0, s1, lo, hi, out in ((a - w, a, z0 - w, z1 + w, 0.17), (b, b + w, z0 - w, z1 + w, 0.17),
+                                (a - w - 0.18, b + w + 0.18, z1, z1 + w, 0.19), (a - w - 0.18, b + w + 0.18, z0 - w, z0, 0.19)):
+        bar(bm, rec, ch, s0, s1, lo, hi, 0.02, out, IDX["bronze"])
 
 
 def finish_atlas(name, bm, rec, M, c):
@@ -144,6 +208,11 @@ def finish_atlas(name, bm, rec, M, c):
         for li, co in zip(me.polygons[index].loop_indices, uvs):
             uv[li].uv = co
     c.objects.link(bpy.data.objects.new(name, me))
+
+
+def signed(key, i):
+    """The sign a bay lives under; the cafe's second window shares its neighbour's."""
+    return S["SIGNS"].get("B7" if (key, i) == ("B", 6) else "%s%d" % (key, i))
 
 
 def dress(key, info, M, c):
@@ -165,12 +234,20 @@ def dress(key, info, M, c):
         else:
             board = filler.pop() if filler and R.random() < 0.6 else None
             cloth = R.choice(("aw_white", "aw_white", "aw_cream", "aw_green", "aw_terra")) if R.random() < 0.3 else None
+        board = S["SIGNS"].get("%s%d" % (key, i))           # after the draw above, so the awnings stay put
+        shown = signed(key, i)
+        if cloth and shown and not cloth.startswith("eck_"):
+            cloth = "sign:" + shown
+        if (key, i) in FRONTS:                              # the picture stands in front of the plain glazing
+            inset = max(1.45, info["recess"] + 0.1) - 0.13
+            facade_sheet(bm, rec, ch, a - 0.3, a + 3.9, 0.02, G - 0.6, inset, IDX[FRONTS[(key, i)]],
+                         (1, 0, 0, (G - 0.6) / 3.4) if (key, i) in MIRROR else (0, 0, 1, (G - 0.6) / 3.4))
         if board:
             facade_sheet(bm, rec, ch, a + 0.12, b - 0.12, G - 0.56, G - 0.05, 0.31, IDX["signs"], S["uv"](board))
         if cloth:
             awning(bm, rec, ch, a, b, G - 0.6, cloth)
     for i in CAFES.get(key, ()):
-        cafe(bm, rec, ch, *bays[i], R)
+        cafe(bm, rec, ch, *bays[i], R, signed(key, i % len(bays)))
     if key == "D":                                       # letters on the parapet (kikar_norz)
         mid = ch.length * 0.5
         facade_sheet(bm, rec, ch, mid - 3.6, mid + 3.6, info["top"] + 0.3, info["top"] + 0.95, -0.05,
@@ -178,12 +255,7 @@ def dress(key, info, M, c):
     if key == "B":
         z = G + info["H"] * 2 + 0.42                     # banner across an upper balcony (postcard)
         facade_sheet(bm, rec, ch, t0 - 13.0, t0 - 1.0, z, z + 0.75, -0.04, IDX["signs"], S["uv"]("banner_bergner"))
-        s_mid = (t0 + T) / 2                             # the big poster under the red name
-        z0, z1 = G + 1.45, info["top"] + info["attic"] - 3.0
-        half = (z1 - z0) / 3
-        facade_sheet(bm, rec, ch, s_mid - half - 0.18, s_mid + half + 0.18, z0 - 0.18, z1 + 0.18, 0.0,
-                     IDX["iron"], (0, 0, 0.001, 0.001))
-        facade_sheet(bm, rec, ch, s_mid - half, s_mid + half, z0, z1, -0.05, IDX["poster"], (0, 0, 1, 1))
+        cinema_front(bm, rec, ch, (t0 + T) / 2, info["top"] + info["attic"])
     finish_atlas(key + "_shops", bm, rec, M, c)
 
 
@@ -205,7 +277,7 @@ def ad_column(name, pos, M, c):
         quad(bm, rec, [(pa[0], pa[1], z0), (pb[0], pb[1], z0), (pb[0], pb[1], z1), (pa[0], pa[1], z1)], mat,
              [(ua, v0), (ub, v0), (ub, v1), (ua, v1)])
 
-    sets = (("amanut", "flowers", "books"), ("icecream", "hats", "photo"), ("eckmann", "shoes", "bakery"))
+    sets = (("amanut", "flowers", "F2"), ("E1", "F1", "E6"), ("eckmann", "A3", "A4"))
     for i in range(seg):
         group = i // 3
         if group % 2 == 0:

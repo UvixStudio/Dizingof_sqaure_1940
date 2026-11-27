@@ -15,9 +15,11 @@
 <meta property="og:image:height" content="628">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://dizingof-sqaure-1940.vercel.app/assets/og.jpg?v=2">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700&family=Assistant:wght@400;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=1795692568">
-<link rel="preload" as="fetch" crossorigin href="../kikar_web.glb.gz?t=1795692549">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@400;600;700&family=Heebo:wght@400;500;700&family=Secular+One&display=swap">
+<link rel="stylesheet" href="style.css?v=1795799621">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/fontawesome.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/brands.min.css">
+<link rel="preload" as="fetch" crossorigin href="../kikar_web.glb.gz?t=1795781363">
 </head>
 <body>
 <div dir="rtl">
@@ -35,7 +37,6 @@
     <div class="title">
       <h1 id="home" role="button" tabindex="0" title="חזרה למבט הפתיחה">כיכר צינה דיזנגוף<small>שחזור תלת־ממד 1940</small></h1>
     </div>
-    <button class="pill" id="info-btn" aria-expanded="false" aria-controls="notes">על הסקיצה</button>
   </header>
 
   <button class="veil" id="veil" aria-label="סגירת החלון" hidden></button>
@@ -45,33 +46,62 @@
     <h2>מה מדויק ומה משוער</h2>
     <ul>
       <li>גרסת עבודה: המודל נבנה בבלנדר לפי תצלומים מ־1938-1940 ועדיין בתהליך.</li>
-      <li>צורות הבניינים וכיווני הרחובות מ־OpenStreetMap, © תורמי OpenStreetMap. טרם אומת אילו מהבניינים עמדו ב־1940.</li>
+      <li>צורות הבניינים וכיווני הרחובות מ־OpenStreetMap, © תורמי OpenStreetMap. הדגם כולל גם מבנים שהושלמו אחרי 1940, כמו מלון גזית (1948).</li>
       <li>קולנוע אסתר הותאם לתצלומים. החזיתות של שאר הבניינים, הצבעים והרכבים הם פרשנות.</li>
       <li>טבעות הגן, הכביש והמזרקה נמדדו מתצלומים, בדיוק משוער.</li>
-      <li>חלק משמות העסקים לקוחים מתצלומים ומוויקיפדיה, השאר כלליים. מיקום החנויות, צבעי הסככות והכרזה הגדולה הם שחזור.</li>
+      <li>שמות הבתים, שנותיהם והאדריכלים לפי ויקיפדיה. השיוך של בתי פלדמן, גרינמן ומירנברג לגוש מסוים בטבעת הוא השערה.</li>
+      <li>שמות אקמן, קפה אמנות, בית מרקחת וגל-אור לקוחים מתצלומים ומוויקיפדיה. שלמן, ויטמן, פיינשטוק והספר הטוב היו עסקים בתל אביב, לא בהכרח בכיכר. שאר שמות החנויות הומצאו ברוח התקופה. חזיתות החנויות, מיקומן, צבעי הסככות והכרזה הגדולה הם שחזור.</li>
       <li>נקודות המידע (העיגולים החומים) מבוססות על ויקיפדיה ועל המקורות שמצוינים בכל כרטיס.</li>
     </ul>
   </section>
 
   <section class="bar" aria-label="שליטה">
-    <button class="grip" id="grip" aria-label="הצגה או הסתרה של הסרגל" aria-expanded="true"></button>
-    <div class="row">
-      <label class="cam-pick" title="בחירת מצלמה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.6-2.5h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.2" r="3.4"/></svg><select id="cam-select" aria-label="בחירת מצלמה"></select></label>
-      <button class="btn" id="gyro">סיבוב עם הטלפון</button>
-      <button class="btn" id="north" hidden>יישור לצפון</button>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="i-camera" viewBox="0 0 24 24"><rect x="2.5" y="7" width="13" height="10.5" rx="2.2"/><path d="M15.5 11l6-3.3v9.1l-6-3.3"/></symbol>
+      <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-6-6.5-11a6.5 6.5 0 0 1 13 0c0 5-6.500 11-6.500 11z"/><circle cx="12" cy="10" r="2.300"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M14.5 5.5L8 12l6.5 6.5"/></symbol>
+      <symbol id="i-phone" viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2M3.500 9.500v5M20.500 9.500v5"/></symbol>
+      <symbol id="i-compass" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.500"/><path d="M12 6.500l2.500 5.500h-5zM12 17.500L9.500 12h5z"/></symbol>
+    </svg>
+    <p class="hint" id="hint" role="status"></p>
+    <div class="drop">
+      <button class="drop-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="cam-menu" title="בחירת מצלמה"><svg><use href="#i-camera"/></svg><span id="cam-name">מהגג</span><svg class="chev"><use href="#i-chevron"/></svg></button>
+      <div class="menu" id="cam-menu" role="menu" aria-label="מצלמות" hidden>
+        <div class="menu-group" id="cam-list" role="group"></div>
+        <button class="extra" id="gyro" role="menuitemcheckbox" aria-checked="false" hidden><svg><use href="#i-phone"/></svg><span>סיבוב עם הטלפון</span></button>
+        <button id="north" role="menuitem" hidden><svg><use href="#i-compass"/></svg><span>יישור לצפון</span></button>
+      </div>
     </div>
-    <p class="hint" id="hint">גרור כדי להסתובב. צביטה לזום.</p>
-    <div class="row spots" id="spots"><span class="hint">נקודות מידע:</span>
-      <button class="pill" data-spot="opening">חנוכת הכיכר 1938</button>
-      <button class="pill" data-spot="genia">ג'ניה אוורבוך</button>
-      <button class="pill" data-spot="video">Here We Are</button>
+    <div class="drop">
+      <button class="drop-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="spot-menu"><svg><use href="#i-pin"/></svg><span>נקודות מידע</span><svg class="chev"><use href="#i-chevron"/></svg></button>
+      <div class="menu" id="spot-menu" role="menu" aria-label="נקודות מידע" hidden>
+        <button role="menuitem" data-spot="opening"><svg><use href="#i-pin"/></svg><span>חנוכת הכיכר 1938</span></button>
+        <button role="menuitem" data-spot="zina"><svg><use href="#i-pin"/></svg><span>צינה דיזנגוף</span></button>
+        <button role="menuitem" data-spot="levels"><svg><use href="#i-pin"/></svg><span>הכיכר עולה ויורדת</span></button>
+        <button role="menuitem" data-spot="genia"><svg><use href="#i-pin"/></svg><span>ג'ניה אוורבוך</span></button>
+        <button role="menuitem" data-spot="esther"><svg><use href="#i-pin"/></svg><span>קולנוע כיכר דיזנגוף</span></button>
+        <button role="menuitem" data-spot="video"><svg><use href="#i-pin"/></svg><span><bdi>Here We Are</bdi></span></button>
+      </div>
     </div>
   </section>
+  <div class="gesture" id="gesture" role="img" aria-label="גרירה מסובבת את הסצנה">
+    <svg class="touch" viewBox="0 0 64 64"><path d="M13 32H3m5-5-5 5 5 5M51 32h10m-5-5 5 5-5 5"/><g class="slide"><path transform="translate(17 17) scale(1.25)" stroke-width="1.8" d="M22 14a8 8 0 0 1-8 8M18 11v-1a2 2 0 0 0-4 0M14 10V9a2 2 0 0 0-4 0v1M10 9.5V4a2 2 0 0 0-4 0v10M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></g></svg>
+    <svg class="mouse" viewBox="0 0 64 64"><path d="M13 32H3m5-5-5 5 5 5M51 32h10m-5-5 5 5-5 5"/><g class="slide"><rect x="23" y="17" width="18" height="30" rx="9"/><path d="M32 23v8"/></g></svg>
+  </div>
+  <div class="quick" id="quick">
+    <div class="quick-list" id="quick-list" role="menu" aria-label="תפריט" hidden>
+      <button role="menuitem" id="info-btn" aria-haspopup="dialog" aria-label="אודות" title="אודות"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 10.500v8M12 5.500v.100" stroke-width="3.2"/></svg></i></button>
+      <button role="menuitem" id="quick-share" aria-label="שיתוף" title="שיתוף"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="17.500" cy="5.500" r="2.800"/><circle cx="6.500" cy="12" r="2.800"/><circle cx="17.500" cy="18.500" r="2.800"/><path d="M9 10.600l6-3.600M9 13.400l6 3.600"/></svg></i></button>
+      <button role="menuitemcheckbox" aria-checked="false" id="quick-night" data-keep aria-label="מוד לילה" title="מוד לילה"><i><svg class="moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.500A8.500 8.500 0 0 1 9.500 4a8.500 8.500 0 1 0 10.500 10.500z"/></svg><svg class="sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.200"/><path d="M12 2.500v2.500M12 19v2.500M2.500 12H5M19 12h2.500M5.300 5.300l1.800 1.800M16.900 16.900l1.800 1.800M5.300 18.700l1.800-1.800M16.900 7.100l1.800-1.800"/></svg></i></button>
+    </div>
+    <button class="quick-btn" id="quick-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="quick-list" aria-label="תפריט: אודות, שיתוף, יום ולילה" title="תפריט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  </div>
+  <button class="lang-btn" id="lang-btn" lang="en" aria-label="English"><span class="long">English</span><span class="short">EN</span></button>
 </div>
 
 
 <script src="../lib/three.min.js"></script>
 <script src="../lib/GLTFLoader.js"></script>
-<script src="scene.js?v=1795692568"></script>
+<script src="scene.js?v=1795799621"></script>
 </body>
 </html>

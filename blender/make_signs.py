@@ -28,18 +28,32 @@ def text(d, xy, s, size, fill, maxw=None, font=None):
     d.text(xy, s, font=f, fill=fill, anchor="mm")
 
 
-atlas = Image.new("RGB", (ATLAS, ATLAS), WALL)
+atlas = Image.new("RGB", (ATLAS, ATLAS_H), WALL)
 d = ImageDraw.Draw(atlas)
-for key, (he, la, bg, fg, _src) in BOARDS.items():
+
+
+def board(key, bg, fg):
     x, y, w, h = CELLS[key]
     d.rectangle((x, y, x + w, y + h), fill=bg)
     d.rectangle((x + 10, y + 10, x + w - 11, y + h - 11), outline=fg, width=4)
+    return x, y, w, h
+
+
+for key, (he, la, bg, fg, _src) in BOARDS.items():
+    x, y, w, h = board(key, bg, fg)
     if la:                                               # Hebrew on the right, Latin on the left
-        text(d, (x + w * 0.73, y + h / 2 + 2), rtl(he), 92, fg, w * 0.44)
-        text(d, (x + w * 0.26, y + h / 2 + 2), la, 84, fg, w * 0.42)
-        d.ellipse((x + w * 0.495 - 7, y + h / 2 - 7, x + w * 0.495 + 7, y + h / 2 + 7), fill=fg)
+        text(d, (x + w * 0.73, y + h / 2 + 2), rtl(he), 112, fg, w * 0.44)
+        text(d, (x + w * 0.26, y + h / 2 + 2), la, 100, fg, w * 0.42)
+        d.ellipse((x + w * 0.495 - 8, y + h / 2 - 8, x + w * 0.495 + 8, y + h / 2 + 8), fill=fg)
     else:
-        text(d, (x + w / 2, y + h / 2 + 2), rtl(he), 98, fg, w * 0.86)
+        text(d, (x + w / 2, y + h / 2 + 2), rtl(he), 118, fg, w * 0.86)
+for key, (name, trade, (bg, fg), _src) in NAMED.items():  # the shop's name large, its trade small under it
+    x, y, w, h = board(key, bg, fg)
+    text(d, (x + w / 2, y + h * 0.36), rtl(name), 88, fg, w * 0.90)
+    text(d, (x + w / 2, y + h * 0.80), rtl(trade), 36, fg, w * 0.70)
+    half = d.textlength(rtl(trade), font=ImageFont.truetype(BOLD, 36)) / 2 + 22
+    for side in (-1, 1):                                 # a short rule on each side of the small line
+        d.line((x + w / 2 + side * half, y + h * 0.80, x + w / 2 + side * (half + 90), y + h * 0.80), fill=fg, width=3)
 for key, s in (("aw_eck_en", "ECKMANN"), ("aw_eck_he", rtl("אקמן"))):
     x, y, w, h = CELLS[key]
     d.rectangle((x, y, x + w, y + h), fill=(238, 234, 222))
@@ -50,7 +64,9 @@ text(d, (x + w * 0.26, y + h / 2), "PHARMACY", 90, (34, 32, 30), w * 0.46)
 x, y, w, h = CELLS["banner_bergner"]
 text(d, (x + w * 0.76, y + h / 2), rtl("אליזבת ברגנר"), 108, (38, 34, 34), w * 0.42)
 text(d, (x + w * 0.27, y + h / 2), "ELIZABETH BERGNER", 100, (38, 34, 34), w * 0.50)
-atlas.save(os.path.join(OUT, "signs.jpg"), quality=86)
+if atlas.height > 4096:                                  # phones take 4096 at most
+    atlas = atlas.resize((ATLAS, 4096), Image.LANCZOS)
+atlas.save(os.path.join(OUT, "signs.jpg"), quality=95, subsampling=0)   # sharp letter edges
 
 # ---------- the poster ----------
 W, H = 768, 1152

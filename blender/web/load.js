@@ -9,7 +9,7 @@
   }
   const painted = () => new Promise((ok) => { requestAnimationFrame(() => setTimeout(ok, 0)); setTimeout(ok, 300); });   // let the screen catch up
   async function download(url, size) {
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: "no-cache" });   // ask the server, a rebuild may have reused the address
     if (!res.ok) throw new Error(url + " " + res.status);
     if (!res.body || !res.body.getReader) return res.arrayBuffer();
     const total = +res.headers.get("content-length") || size, reader = res.body.getReader(), parts = [];
@@ -36,7 +36,7 @@
     progress(.98, "מדליקים את האור"); await painted();
     renderer.compile(scene, camera); await painted(); await painted();
     progress(1); shown = true;
-    veilLoad.classList.add("done"); setTimeout(() => { veilLoad.hidden = true; }, 700);
+    veilLoad.classList.add("done"); setTimeout(() => { veilLoad.hidden = true; showHint(); }, 700);
   }
   function loadFailed(e) {
     console.error(e);

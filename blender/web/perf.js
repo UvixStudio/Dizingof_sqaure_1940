@@ -1,18 +1,22 @@
 // ---------- picture quality for the device ----------
-  // Antialiasing is almost free on phone GPUs and very expensive on laptop integrated graphics
-  // (measured on Iris Xe at 1080p: 69 ms a frame with it, 32 ms without). It can only be chosen when the context is made.
+  // Smooth edges (antialiasing) are on, except on phones with a Mali GPU: there the whole picture flickered with them
+  // (a screen recording from a Mali-G57, 27.11: thin layers turned half see-through for single frames; ?noaa was steady).
+  // On laptop integrated graphics they are dear, so those start with a little fewer pixels. Chosen once, with the context.
   const coarse = matchMedia("(pointer: coarse)").matches;
   const metered = /[?&]fps\b/.test(location.search);                  // add ?fps to the address
-  const gpuName = coarse && !metered ? "" : (() => {                    // phones always keep antialiasing: no need to ask
+  const gpuName = (() => {
     const g = document.createElement("canvas").getContext("webgl"); if (!g) return "";
     const e = g.getExtension("WEBGL_debug_renderer_info"), n = e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : "";
     const lose = g.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
     return String(n);
   })();
   const weak = !coarse && /intel|uhd|iris|swiftshader|llvmpipe|basic render/i.test(gpuName);
-  let ratio = Math.min(window.devicePixelRatio || 1, weak ? 1.25 : 2);
+  const mali = coarse && /mali/i.test(gpuName);
+  const smoothing = /[?&]noaa\b/.test(location.search) ? false : /[?&]aa\b/.test(location.search) || !mali;   // ?aa / ?noaa to compare
+  const forced = Number((location.search.match(/[?&]px=([0-9.]+)/) || [])[1]) || 0;   // ?px=2 : this many pixels, never lowered
+  let ratio = Math.min(window.devicePixelRatio || 1, forced || (weak ? (smoothing ? 1 : 1.25) : 2));
   // if frames stay slow, draw fewer pixels (only ever downwards, so the picture does not keep changing)
-  const pace = { sum: 0, n: 0, slow: 0, first: null, done: false, from: performance.now() + 4000, floor: Math.min(ratio, coarse ? 1.2 : .8) };
+  const pace = { sum: 0, n: 0, slow: 0, first: null, done: forced > 0, from: performance.now() + 4000, floor: Math.min(ratio, coarse ? 1.2 : .8) };
   const meter = metered ? document.body.appendChild(document.createElement("div")) : null;
   if (meter) meter.className = "fps";
   function adapt(ms, now) {
@@ -26,6 +30,6 @@
       // all the way down and no faster (a phone saving battery caps at 30 fps): the pixels were not the problem, put them back
       else if (pace.first && avg > pace.first.avg * .92) { ratio = pace.first.ratio; renderer.setPixelRatio(ratio); pace.done = true; }
     }
-    if (meter) meter.textContent = `${(1000 / avg).toFixed(0)} fps | x${ratio.toFixed(2)} | ${weak ? "no AA" : "AA"} | ${gpuName}`;
+    if (meter) meter.textContent = `${(1000 / avg).toFixed(0)} fps | x${ratio.toFixed(2)} | ${smoothing ? "AA" : "no AA"} | near ${camera.near} | depth ${renderer.getContext().getParameter(0x0d56)} | ${gpuName}`;
   }
 

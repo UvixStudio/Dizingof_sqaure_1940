@@ -1,5 +1,5 @@
 """Render the four views and export a GLB for blender/preview/index.html (run inside Blender)."""
-import bpy, json, os, runpy, time
+import bpy, json, os, runpy, shutil, subprocess, time
 
 ROOT = r"C:\Ai\01_kikar_dizingof"
 
@@ -74,6 +74,9 @@ def publish():
         me.calc_loop_triangles()
         tris += len(me.loop_triangles)
         ev.to_mesh_clear()
+    runpy.run_path(os.path.join(ROOT, "blender", "people_lineup.py"))["export"](out)      # the review page of the figures
+    # the packed model must be ready before the stamp: an open page reloads as soon as the stamp changes
+    subprocess.run([shutil.which("python") or "python", os.path.join(ROOT, "blender", "pack_web.py")], check=True)
     info = {"time": int(time.time()), "tris": tris,
             "glb_mb": round(os.path.getsize(glb) / 1e6, 2)}
     with open(os.path.join(out, "stamp.json"), "w") as f:

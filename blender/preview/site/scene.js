@@ -13,20 +13,24 @@
   };
 
   // ---------- picture quality for the device ----------
-  // Antialiasing is almost free on phone GPUs and very expensive on laptop integrated graphics
-  // (measured on Iris Xe at 1080p: 69 ms a frame with it, 32 ms without). It can only be chosen when the context is made.
+  // Smooth edges (antialiasing) are on, except on phones with a Mali GPU: there the whole picture flickered with them
+  // (a screen recording from a Mali-G57, 27.11: thin layers turned half see-through for single frames; ?noaa was steady).
+  // On laptop integrated graphics they are dear, so those start with a little fewer pixels. Chosen once, with the context.
   const coarse = matchMedia("(pointer: coarse)").matches;
   const metered = /[?&]fps\b/.test(location.search);                  // add ?fps to the address
-  const gpuName = coarse && !metered ? "" : (() => {                    // phones always keep antialiasing: no need to ask
+  const gpuName = (() => {
     const g = document.createElement("canvas").getContext("webgl"); if (!g) return "";
     const e = g.getExtension("WEBGL_debug_renderer_info"), n = e ? g.getParameter(e.UNMASKED_RENDERER_WEBGL) : "";
     const lose = g.getExtension("WEBGL_lose_context"); if (lose) lose.loseContext();
     return String(n);
   })();
   const weak = !coarse && /intel|uhd|iris|swiftshader|llvmpipe|basic render/i.test(gpuName);
-  let ratio = Math.min(window.devicePixelRatio || 1, weak ? 1.25 : 2);
+  const mali = coarse && /mali/i.test(gpuName);
+  const smoothing = /[?&]noaa\b/.test(location.search) ? false : /[?&]aa\b/.test(location.search) || !mali;   // ?aa / ?noaa to compare
+  const forced = Number((location.search.match(/[?&]px=([0-9.]+)/) || [])[1]) || 0;   // ?px=2 : this many pixels, never lowered
+  let ratio = Math.min(window.devicePixelRatio || 1, forced || (weak ? (smoothing ? 1 : 1.25) : 2));
   // if frames stay slow, draw fewer pixels (only ever downwards, so the picture does not keep changing)
-  const pace = { sum: 0, n: 0, slow: 0, first: null, done: false, from: performance.now() + 4000, floor: Math.min(ratio, coarse ? 1.2 : .8) };
+  const pace = { sum: 0, n: 0, slow: 0, first: null, done: forced > 0, from: performance.now() + 4000, floor: Math.min(ratio, coarse ? 1.2 : .8) };
   const meter = metered ? document.body.appendChild(document.createElement("div")) : null;
   if (meter) meter.className = "fps";
   function adapt(ms, now) {
@@ -40,12 +44,12 @@
       // all the way down and no faster (a phone saving battery caps at 30 fps): the pixels were not the problem, put them back
       else if (pace.first && avg > pace.first.avg * .92) { ratio = pace.first.ratio; renderer.setPixelRatio(ratio); pace.done = true; }
     }
-    if (meter) meter.textContent = `${(1000 / avg).toFixed(0)} fps | x${ratio.toFixed(2)} | ${weak ? "no AA" : "AA"} | ${gpuName}`;
+    if (meter) meter.textContent = `${(1000 / avg).toFixed(0)} fps | x${ratio.toFixed(2)} | ${smoothing ? "AA" : "no AA"} | near ${camera.near} | depth ${renderer.getContext().getParameter(0x0d56)} | ${gpuName}`;
   }
 
 // ---------- renderer ----------
   const canvas = $("gl");
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !weak });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: smoothing });
   renderer.setPixelRatio(ratio);
   THREE.ShaderChunk.fog_fragment += "\ngl_FragColor.rgb = clamp(mat3(0.87496,0.07231,0.06063,0.17522,0.95862,0.13959,0.03588,0.03269,0.82307) * gl_FragColor.rgb + (-0.01500), 0.0, 1.0);";   // colour grade, once per pixel inside the shaders
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -192,14 +196,14 @@
   function canvasTex(w, h, draw) {
     const c = document.createElement("canvas"); c.width = w; c.height = h; const tex = new THREE.CanvasTexture(c);
     const go = () => { const x = c.getContext("2d"); x.clearRect(0, 0, w, h); x.textAlign = "center"; x.textBaseline = "middle"; x.direction = "rtl"; draw(x); tex.needsUpdate = true; };
-    go(); if (document.fonts && document.fonts.load) document.fonts.load('700 100px "Frank Ruhl Libre"').then(go).catch(() => {});
+    go(); if (document.fonts && document.fonts.load) Promise.all([700, 900].map((w) => document.fonts.load(w + ' 100px "Frank Ruhl Libre"', 'אבA'))).then(go).catch(() => {});
     return tex;
   }
   const signTex = (name, en) => canvasTex(768, 384, (x) => {   // enamel street plate: Hebrew over Latin, nothing else
     rr(x, 6, 6, 756, 372, 40); x.fillStyle = "rgba(29,42,90,.78)"; x.fill();
     x.strokeStyle = "#ffffff"; x.lineWidth = 6; rr(x, 24, 24, 720, 336, 28); x.stroke();
-    x.fillStyle = "#ffffff"; x.font = "700 150px " + SERIF; x.fillText(name, 384, 140);
-    x.font = "600 76px " + SERIF; x.fillText(en, 384, 292);
+    x.fillStyle = "#ffffff"; x.font = "900 152px " + SERIF; x.fillText(name, 384, 140);
+    x.font = "900 74px " + SERIF; x.fillText(en, 384, 292);
   });
   const groundTex = (name) => canvasTex(1024, 320, (x) => { x.fillStyle = "rgba(43,41,37,.7)"; x.font = "700 210px " + SERIF; x.fillText(name, 512, 165); });
   const marqueeTex = () => canvasTex(1024, 220, (x) => {
@@ -241,19 +245,19 @@
   const signs = [];
   const SIGN_Y = 16, SIGN_W = 4.8, SIGN_H = 2.4;
   const fadeTex = (() => { const c = document.createElement("canvas"); c.width = 4; c.height = 128; const x = c.getContext("2d"), g = x.createLinearGradient(0, 0, 0, 128);
-    g.addColorStop(0, "rgba(29,42,90,.85)"); g.addColorStop(.55, "rgba(29,42,90,.4)"); g.addColorStop(1, "rgba(29,42,90,0)"); x.fillStyle = g; x.fillRect(0, 0, 4, 128); return new THREE.CanvasTexture(c); })();
-  const padTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d"), g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
-    g.addColorStop(0, "rgba(40,62,130,.85)"); g.addColorStop(.45, "rgba(40,62,130,.55)"); g.addColorStop(1, "rgba(40,62,130,0)"); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+    g.addColorStop(0, "rgba(250,240,216,.95)"); g.addColorStop(.55, "rgba(250,240,216,.6)"); g.addColorStop(1, "rgba(250,240,216,.3)"); x.fillStyle = g; x.fillRect(0, 0, 4, 128); return new THREE.CanvasTexture(c); })();
+  const padTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d");
+    x.fillStyle = "#ffffff"; x.beginPath(); x.arc(64, 64, 62, 0, 7); x.fill(); return new THREE.CanvasTexture(c); })();
   function addSign(a) {
     const s = new THREE.Group(); s.position.copy(P(44, a.t, SIGN_Y)); scene.add(s);
     const sm = new THREE.MeshBasicMaterial({ map: signTex(a.name, a.en), transparent: true, opacity: 1, depthWrite: false, side: THREE.DoubleSide }); s.userData.m = sm;
     s.add(new THREE.Mesh(new THREE.PlaneGeometry(SIGN_W, SIGN_H), sm));
     // a hairline that fades into the ground, ending in a soft blue dot: it reads as a marker, not a pole
-    const base = P(44, a.t, 0), stem = new THREE.Mesh(new THREE.PlaneGeometry(.1, SIGN_Y - SIGN_H / 2), new THREE.MeshBasicMaterial({ map: fadeTex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+    const base = P(44, a.t, 0), stem = new THREE.Mesh(new THREE.PlaneGeometry(.045, SIGN_Y - SIGN_H / 2), new THREE.MeshBasicMaterial({ map: fadeTex, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
     stem.position.set(base.x, (SIGN_Y - SIGN_H / 2) / 2, base.z); scene.add(stem); s.userData.stem = stem;
-    const dotM = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 2.6).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: padTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    const dotM = new THREE.Mesh(new THREE.PlaneGeometry(.62, .62).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: padTex, color: 0xfff1d6, opacity: .95, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
     dotM.position.set(base.x, .13, base.z); scene.add(dotM);
-    dotM.userData.keep = true;
+    dotM.userData.keep = true; dotM.userData.pad = true;
     signs.push(s);
   }
 
@@ -733,28 +737,33 @@
   const CAMS = [
     { k: "in", label: "בתוך הכיכר" },
     { k: "walk", label: "מהמדרכה" },
-    { k: "roof", label: "מגג" },
+    { k: "roof", label: "מהגג" },
     { k: "top", label: "מבט על" },
-    { k: "car", label: "מאחורי מכונית", target: "car_coupe", dist: 8.5, el: .36, fov: 62, road: [36.6, 45.2] }
+    { k: "car", label: "מאחורי מכונית", ride: true, el: .36, fov: 62, road: [36.6, 45.2] }
   ];
   const HINT = "גרור כדי להסתובב. צביטה לזום.", HINT_TOP = "גרור כדי להקיף את הכיכר. צביטה לקרב ולהרחיק.";
   const HINT_RIDE = "נוסעים סביב הכיכר. גרור כדי להסתכל מסביב לרכב, צביטה לקרב ולהרחיק.";
   const look = { yaw: 0, pitch: 0 }, cam = { mode: "fp", az: D(20), el: D(46), dist: 135 };
   const ride = { def: null, yaw: 0, el: 0, dist: 0, t: 0, from: { pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: 70 } };
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const camSelect = $("cam-select");
-  camSelect.innerHTML = CAMS.map((c) => `<option value="${c.k}">${c.label}</option>`).join("") + '<option value="free" hidden disabled>מבט חופשי</option>';
-  const setPressed = (k) => { camSelect.value = k || "free"; };
+  const camList = $("cam-list");
+  camList.innerHTML = CAMS.map((c) => `<button role="menuitemradio" aria-checked="false" data-cam="${c.k}"><svg><use href="#i-camera"/></svg><span>${c.label}</span></button>`).join("");
+  function setPressed(k) {                                            // null: a point of interest moved the camera
+    const c = CAMS.find((x) => x.k === k);
+    $("cam-name").textContent = c ? c.label : "מבט חופשי";
+    camList.querySelectorAll("[data-cam]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.cam === k)));
+  }
   let flight = null;
   function setView(k) {
     const c = CAMS.find((x) => x.k === k);
     flight = null; stopMotion(); setPressed(k);
     if (k === "top") { if (gyro.on || gyro.listening) gyroOff(); cam.mode = "orbit"; camera.fov = 55; camera.updateProjectionMatrix(); $("hint").textContent = HINT_TOP; return; }
-    if (c.target) {
+    if (c.ride) {
       if (gyro.on || gyro.listening) gyroOff();
       camera.getWorldQuaternion(ride.from.quat); ride.from.pos.copy(rig.position); ride.from.fov = camera.fov;
       rig.rotation.set(0, 0, 0); camera.quaternion.copy(ride.from.quat);
-      Object.assign(ride, { def: c, yaw: 0, el: c.el, dist: c.dist, t: 0 });
+      const def = Object.assign({}, c, pickRide());
+      Object.assign(ride, { def, yaw: 0, el: c.el, dist: def.dist || 9, t: 0 });
       cam.mode = "ride"; $("hint").textContent = HINT_RIDE; return;
     }
     cam.mode = "fp"; const v = VIEWS[k];
@@ -763,7 +772,78 @@
     camera.fov = 70; camera.updateProjectionMatrix();
     if (!gyro.on) $("hint").textContent = HINT;
   }
-  camSelect.addEventListener("change", () => { closeCard(); setView(camSelect.value); camSelect.blur(); });
+  camList.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-cam]");
+    if (b) { closeCard(); setView(b.dataset.cam); }
+  });
+
+  // ---------- the two menus of the bar, and the passing hint above it ----------
+  const menus = Array.from(document.querySelectorAll(".drop, .quick"), (d) => ({ box: d, btn: d.querySelector(".drop-btn, .quick-btn"), list: d.querySelector(".menu, .quick-list") }));
+  const choices = (m) => Array.from(m.list.querySelectorAll("button")).filter((b) => !b.hidden);
+  function closeMenus(refocus) {
+    menus.forEach((m) => {
+      if (m.list.hidden) return;
+      m.list.hidden = true; m.btn.setAttribute("aria-expanded", "false");
+      if (refocus) m.btn.focus({ preventScroll: true });
+    });
+  }
+  menus.forEach((m) => {
+    m.btn.addEventListener("click", () => {
+      const open = m.list.hidden; closeMenus();
+      if (!open) return;
+      m.list.hidden = false; m.btn.setAttribute("aria-expanded", "true");
+      (m.list.querySelector('[aria-checked="true"]') || choices(m)[0]).focus({ preventScroll: true });
+    });
+    m.list.addEventListener("click", (e) => { if (e.target.closest("button:not([data-keep])")) closeMenus(true); });
+    m.box.addEventListener("keydown", (e) => {
+      if (m.list.hidden) return;
+      if (e.key === "Escape") { e.stopPropagation(); closeMenus(true); return; }
+      if (e.key === "Tab") { closeMenus(); return; }
+      const all = choices(m), i = all.indexOf(document.activeElement);
+      const to = { ArrowDown: i + 1, ArrowUp: i - 1, Home: 0, End: all.length - 1 }[e.key];
+      if (to === undefined) return;
+      e.preventDefault(); all[(to + all.length) % all.length].focus({ preventScroll: true });
+    });
+  });
+  addEventListener("pointerdown", (e) => { if (!e.target.closest(".drop, .quick")) closeMenus(); }, true);
+  const hintEl = $("hint"); let hintTimer = 0, hintSaid = "";
+  // "how to look around" is a small moving hand (or mouse), shown until the first drag or zoom. Other messages are text
+  const LOOKING = new Set([HINT, HINT_TOP, HINT_RIDE]);
+  let gestureDone = false;
+  try { gestureDone = sessionStorage.getItem("moved") === "1"; } catch (e) { /* private window: show it once per load */ }
+  function endGesture() { gestureDone = true; $("gesture").classList.remove("on"); try { sessionStorage.setItem("moved", "1"); } catch (e) { /* see above */ } }
+  function showHint() {
+    clearTimeout(hintTimer); hintEl.classList.remove("on");
+    const text = hintEl.textContent;
+    if (!text || LOOKING.has(text)) { $("gesture").classList.toggle("on", !gestureDone); return; }
+    $("gesture").classList.remove("on"); hintEl.classList.add("on");
+    hintTimer = setTimeout(() => hintEl.classList.remove("on"), 2500 + text.length * 60);
+  }
+  canvas.addEventListener("pointermove", () => { if (!gestureDone && (ptrs.size > 1 || (ptrs.size && tap && tap.moved > 8))) endGesture(); });
+  canvas.addEventListener("wheel", endGesture, { passive: true });
+  $("lang-btn").addEventListener("click", () => { hintEl.textContent = "הגרסה באנגלית בדרך"; showHint(); });
+  // day / night (web/night.js): the icon shows where a press will lead
+  $("quick-night").addEventListener("click", (e) => {
+    const b = e.currentTarget, night = b.getAttribute("aria-checked") !== "true";
+    b.setAttribute("aria-checked", String(night)); b.title = night ? "אור יום" : "מוד לילה";
+    setNight(night);
+  });
+  // pop-ups start under the title plate, whatever its size on this screen
+  const placeCards = () => document.documentElement.style.setProperty("--below", Math.round($("home").getBoundingClientRect().bottom + 24) + "px");
+  new ResizeObserver(placeCards).observe($("home")); addEventListener("resize", placeCards);
+  new MutationObserver(() => { if (hintEl.textContent !== hintSaid) { hintSaid = hintEl.textContent; showHint(); } }).observe(hintEl, { childList: true });
+  // every time this camera is chosen it follows a different kind of vehicle: [distance behind, extra height]
+  const RIDES = { truck: [10, .6], bus: [12, 1.3], bus_city: [11.5, 1], van: [9.5, .5], sedan: [8.5, 0], coupe: [8.2, 0], cart: [8, .2] };
+  let lastRide = "";
+  function pickRide() {
+    const kindOf = (m) => m.o.name.slice(4).replace(/[_.]?\d+$/, "");
+    const cars = movers.filter((m) => m.o.name.startsWith("car_") && RIDES[kindOf(m)]);
+    const kinds = [...new Set(cars.map(kindOf))].filter((k) => k !== lastRide);
+    if (!kinds.length) return {};
+    lastRide = kinds[Math.floor(Math.random() * kinds.length)];
+    const same = cars.filter((m) => kindOf(m) === lastRide);
+    return { target: same[Math.floor(Math.random() * same.length)].o.name, dist: RIDES[lastRide][0], lift: RIDES[lastRide][1] };
+  }
   function applyOrbit() {
     const tgt = new THREE.Vector3(0, 3, 0), c = Math.cos(cam.el);
     const pos = new THREE.Vector3(Math.sin(cam.az) * c, Math.sin(cam.el), Math.cos(cam.az) * c).multiplyScalar(cam.dist).add(tgt);
@@ -778,16 +858,16 @@
     const p = m.o.position, s = Math.sign(m.w);
     back.set(-p.z * s, 0, p.x * s).normalize().applyAxisAngle(Y_AXIS, ride.yaw);     // against the driving direction
     const flat = ride.dist * Math.cos(ride.el);
-    eye.set(p.x + back.x * flat, p.y + 1.1 + ride.dist * Math.sin(ride.el), p.z + back.z * flat);
+    eye.set(p.x + back.x * flat, p.y + 1.1 + (ride.def.lift || 0) + ride.dist * Math.sin(ride.el), p.z + back.z * flat);
     // never leave the road (trees inside it, buildings outside): when swung to the side, rise over the car instead
     const r = Math.hypot(eye.x, eye.z), onRoad = clamp(r, ride.def.road[0], ride.def.road[1]);
     if (onRoad !== r) {
       eye.x *= onRoad / r; eye.z *= onRoad / r;
       const over = Math.hypot(eye.x - p.x, eye.z - p.z);
-      eye.y = Math.max(eye.y, p.y + 1.1 + Math.sqrt(Math.max(0, ride.dist * ride.dist - over * over)));
+      eye.y = Math.max(eye.y, p.y + 1.1 + (ride.def.lift || 0) + Math.sqrt(Math.max(0, ride.dist * ride.dist - over * over)));
     }
     const past = 4.5 * Math.max(0, Math.cos(ride.yaw));               // from behind: aim past the car. From the side: at it
-    const dx = p.x - back.x * past - eye.x, dy = p.y + 1.3 - eye.y, dz = p.z - back.z * past - eye.z;
+    const dx = p.x - back.x * past - eye.x, dy = p.y + 1.3 + (ride.def.lift || 0) * .6 - eye.y, dz = p.z - back.z * past - eye.z;
     camera.rotation.set(Math.atan2(dy, Math.hypot(dx, dz)), Math.atan2(-dx, -dz), 0);
     ride.t += dt;
     const u = reduce ? 1 : Math.min(1, ride.t / 1.1);
@@ -879,13 +959,14 @@
     removeEventListener("deviceorientationabsolute", oriAbs); removeEventListener("deviceorientation", oriRel);
     if (gyro.on) { const f = new THREE.Vector3(); camera.getWorldDirection(f); look.yaw = Math.atan2(-f.x, -f.z); look.pitch = Math.asin(clamp(f.y, -1, 1)); }
     gyro.on = false; gyro.listening = false; gyro.e = null; rig.rotation.set(0, 0, 0);
-    $("gyro").classList.remove("on"); $("gyro").textContent = "סיבוב עם הטלפון"; $("north").hidden = true; $("hint").textContent = HINT;
+    $("gyro").setAttribute("aria-checked", "false"); $("north").hidden = true; $("hint").textContent = HINT;
   }
   function alignNorth() {   // the phone is pointing north right now
     const f = new THREE.Vector3(); camera.getWorldDirection(f);
     rig.rotation.y += Math.atan2(f.x, -f.z);
   }
   $("north").addEventListener("click", alignNorth);
+  $("gyro").hidden = !(coarse && window.DeviceOrientationEvent);        // only where there is a phone to turn
   $("gyro").addEventListener("click", async () => {
     if (gyro.on || gyro.listening) { gyroOff(); return; }
     try {
@@ -898,14 +979,13 @@
     } catch (_) { $("hint").textContent = "אין הרשאה לחיישנים. גרור כדי להסתובב."; }
   });
   function onGyroState() {
-    $("gyro").classList.add("on"); $("gyro").textContent = "כבה סיבוב טלפון";
+    $("gyro").setAttribute("aria-checked", "true"); endGesture();
     $("north").hidden = gyro.abs;
     $("hint").textContent = gyro.abs ? "הסצנה מכוונת לצפון לפי המצפן. גרירה מסובבת אותה אם צריך."
-                                     : "כוון את הטלפון לצפון ולחץ ׳יישור לצפון׳. גרירה מסובבת את הסצנה.";
+                                     : "כוון את הטלפון לצפון ובחר ׳יישור לצפון׳ בתפריט המצלמות.";
   }
 
-$("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden = !n.hidden; $("info-btn").setAttribute("aria-expanded", String(!n.hidden)); });
-  $("notes").addEventListener("click", () => { $("notes").hidden = true; $("info-btn").setAttribute("aria-expanded", "false"); });
+$("info-btn").addEventListener("click", () => openAbout());
 
   // ---------- hotspots: markers, fly-to, pop-up cards ----------
   const IMG_GENIA = "../assets/genia.jpg", IMG_PLAN = "../assets/plan.jpg";
@@ -947,12 +1027,10 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
     }
   };
   const canvasIcon = (draw) => canvasTex(128, 128, (x) => { draw(x); });
-  const markerTex = (icon) => canvasIcon((x) => {
-    x.fillStyle = "rgba(236,223,192,.96)"; x.beginPath(); x.arc(64, 64, 60, 0, 7); x.fill();
-    x.fillStyle = "#4a3425"; x.beginPath(); x.arc(64, 64, 51, 0, 7); x.fill();
-    x.fillStyle = "#f0e3c2";
-    if (icon === "person") { x.beginPath(); x.arc(64, 46, 14, 0, 7); x.fill(); x.beginPath(); x.moveTo(36, 94); x.quadraticCurveTo(64, 48, 92, 94); x.closePath(); x.fill(); }
-    else { x.beginPath(); x.moveTo(52, 40); x.lineTo(52, 88); x.lineTo(92, 64); x.closePath(); x.fill(); }
+  const markerTex = () => canvasIcon((x) => {
+    x.fillStyle = "#4a3425"; x.beginPath(); x.arc(64, 64, 62, 0, 7); x.fill();
+    x.fillStyle = "#f4ead0"; x.beginPath(); x.moveTo(64, 108); x.bezierCurveTo(46, 89, 35, 71, 35, 52); x.arc(64, 52, 29, Math.PI, 0); x.bezierCurveTo(93, 71, 82, 89, 64, 108); x.fill();
+    x.fillStyle = "#4a3425"; x.beginPath(); x.arc(64, 52, 11, 0, 7); x.fill();
   });
   const ringTex = () => canvasIcon((x) => { x.strokeStyle = "#f0e3c2"; x.lineWidth = 5; x.beginPath(); x.arc(64, 64, 58, 0, 7); x.stroke(); });
   const hotspots = [];
@@ -961,9 +1039,12 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
     const f = lookAt.clone().sub(camPos).normalize();
     hotspots.push({ key, pos, sp: mk(markerTex(icon), 6), ring: mk(ringTex(), 5), cam: { pos: camPos, yaw: Math.atan2(-f.x, -f.z), pitch: Math.asin(f.y) } });
   }
-  { // Genia on the south bench (the seated woman)
-    const t = benches[7];
-    addHotspot("genia", "person", P(20.95, t, 3.5), P(16.6, t - D(9), 1.6), P(20.95, t, 2.6));
+  const GENIA_AT = P(25.25, D(34), 0);
+  addHotspot("genia", "person", P(25.1, D(34), 2.12), P(23.45, D(29.1), 1.62), P(25.05, D(34), 0.94));   // from her side, a little above
+  hotspots[hotspots.length - 1].aside = true;
+  function clearView() {                                  // nobody strolls between her and whoever is reading about her
+    const close = rig.position.distanceTo(GENIA_AT) < 4.6;
+    movers.forEach((m) => { m.o.visible = m.o.name === "idle_genia" || !close || m.o.position.distanceTo(GENIA_AT) > 4.4; });
   }
   { // a film camera on a tripod on the inner lawn, between the pool and the fence
     const tg = new THREE.Group(); tg.position.copy(P(13.2, D(250), 0)); scene.add(tg);
@@ -977,35 +1058,40 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
   const esc = (t) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;");
   function openCard(h) {
     const c = CARDS[h.key];
-    let html = `<div class="head"><div><h2 id="card-title">${esc(c.title)}</h2>${c.by ? `<p class="by">${esc(c.by)}</p>` : ""}<p class="sub">${esc(c.sub)}</p></div><button class="x" id="card-x" aria-label="סגירה">✕</button></div>`;
+    let html = `<div class="head"><div><h2 id="card-title">${esc(c.title)}</h2>${c.by ? `<p class="by">${esc(c.by)}</p>` : ""}<p class="sub">${esc(c.sub)}</p></div><button class="x" id="card-x" aria-label="סגירה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="scroll">`;
     (c.figs || []).forEach((f) => { html += `<figure class="${f.port ? "port" : ""}"><img src="${f.src}" alt="${esc(f.alt)}"><figcaption>${esc(f.cap)}</figcaption></figure>`; });
     if (c.video) html += `<button class="vid" id="vid" aria-label="נגן את הסרטון" style="aspect-ratio:${c.ratio || '16 / 9'};background-image:url(https://img.youtube.com/vi/${c.video}/hqdefault.jpg)"><span>▶</span></button>`;
     c.body.forEach((t) => { html += `<p>${esc(t)}</p>`; });
+    html += c.extra || "";
     html += `<ul class="links">${c.links.map((l) => `<li><a href="${l.u}" target="_blank" rel="noopener">${esc(l.t)} ↗</a></li>`).join("")}</ul>`;
     if (c.credit) html += `<p class="credit">${esc(c.credit)}</p>`;
-    card.innerHTML = html; card.scrollTop = 0; card.hidden = false; $("veil").hidden = false; $("notes").hidden = true;
+    card.innerHTML = html + "</div>"; card.hidden = false; $("veil").hidden = false; $("notes").hidden = true;
     $("card-x").addEventListener("click", closeCard); $("card-x").focus({ preventScroll: true });
     const v = $("vid");
-    if (v) v.addEventListener("click", () => { v.outerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${c.video}?autoplay=1&rel=0" title="${esc(c.title)}" style="aspect-ratio:${c.ratio || '16 / 9'}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`; });
+    if (v) v.addEventListener("click", () => { if (c.captions) { playWithCaptions(v, c); return; } v.outerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${c.video}?autoplay=1&rel=0" title="${esc(c.title)}" style="aspect-ratio:${c.ratio || '16 / 9'}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`; });
     setBar(true);
   }
-  const barEl = document.querySelector(".bar"), grip = $("grip");
-  const setBar = (min) => { barEl.classList.toggle("min", min); grip.setAttribute("aria-expanded", String(!min)); };
-  grip.addEventListener("click", () => setBar(!barEl.classList.contains("min")));
+  const barEl = document.querySelector(".bar");
+  const setBar = (min) => { barEl.classList.toggle("min", min); closeMenus(); };
   function closeCard() { setBar(false); card.hidden = true; $("veil").hidden = true; card.innerHTML = ""; }
   $("veil").addEventListener("click", closeCard);
-  const goHome = () => { closeCard(); if (gyro.on || gyro.listening) gyroOff(); setView("in"); };
+  const goHome = () => { closeCard(); if (gyro.on || gyro.listening) gyroOff(); setView("roof"); };
   $("home").addEventListener("click", goHome);
   $("home").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goHome(); } });
   addEventListener("keydown", (e) => { if (e.key === "Escape" && !card.hidden) closeCard(); });
   const ease = (u) => u < .5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+  function asideYaw(h) {                                 // on a wide screen the card covers the right side
+    if (!h.aside || innerWidth < 800 || innerHeight < 560) return 0;
+    const covered = (Math.min(576, innerWidth * .46) + 22) / innerWidth;
+    return Math.atan(covered * Math.tan(29 * Math.PI / 180) * innerWidth / innerHeight);
+  }
   function flyTo(h) {
     closeCard(); if (gyro.on || gyro.listening) gyroOff();
     const f = new THREE.Vector3(); camera.getWorldDirection(f);
     const from = { pos: rig.position.clone(), yaw: Math.atan2(-f.x, -f.z), pitch: Math.asin(clamp(f.y, -1, 1)), fov: camera.fov };
     stopMotion(); cam.mode = "fp"; rig.rotation.set(0, 0, 0); look.yaw = from.yaw; look.pitch = from.pitch; setPressed(null); $("hint").textContent = HINT;
     let dy = h.cam.yaw - from.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-    flight = { t0: performance.now(), dur: reduce ? 1 : 1300, from, to: { pos: h.cam.pos, yaw: from.yaw + dy, pitch: h.cam.pitch, fov: 58 }, h };
+    flight = { t0: performance.now(), dur: reduce ? 1 : 1300, from, to: { pos: h.cam.pos, yaw: from.yaw + dy - asideYaw(h), pitch: h.cam.pitch, fov: 58 }, h };
   }
   function handleTap(x, y) {
     camera.updateMatrixWorld(); let best = null, bd = 44;
@@ -1014,9 +1100,9 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
       const d = Math.hypot((v.x + 1) / 2 * innerWidth - x, (1 - v.y) / 2 * innerHeight - y);
       if (d < bd) { bd = d; best = h; }
     });
-    if (best) flyTo(best);
+    if (best) flyTo(best); else walkTo(x, y);
   }
-  document.querySelectorAll("[data-spot]").forEach((b) => b.addEventListener("click", () => flyTo(hotspots.find((h) => h.key === b.dataset.spot))));
+  document.querySelectorAll("[data-spot]").forEach((b) => b.addEventListener("click", () => { const h = hotspots.find((x) => x.key === b.dataset.spot); if (h) flyTo(h); }));
 
   // paper grain
   function grain() {
@@ -1031,12 +1117,13 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
   const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
   let last = performance.now();
   function frame(now) {
-    const ms = now - last, dt = clamp(ms / 1000, 0, .1); last = now; adapt(ms, now); moveTraffic(now, dt);
+    const ms = now - last, dt = clamp(ms / 1000, 0, .1); last = now; adapt(ms, now); moveTraffic(now, dt); clearView();
     if (flight) {
       const u = clamp((now - flight.t0) / flight.dur, 0, 1), e = ease(u), a = flight.from, b = flight.to;
       rig.position.lerpVectors(a.pos, b.pos, e); look.yaw = a.yaw + (b.yaw - a.yaw) * e; look.pitch = a.pitch + (b.pitch - a.pitch) * e;
       camera.fov = a.fov + (b.fov - a.fov) * e; camera.updateProjectionMatrix();
-      if (u >= 1) { const h = flight.h; flight = null; openCard(h); }
+      if (flight.arc) rig.position.y += flight.arc * Math.sin(Math.PI * e);
+      if (u >= 1) { const h = flight.h; flight = null; if (h) openCard(h); }
     }
     updateCamera(dt);
     if (!reduce) {
@@ -1056,16 +1143,16 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
       sg.rotation.y = Math.atan2(rig.position.x - sg.position.x, rig.position.z - sg.position.z);
       const d = Math.hypot(rig.position.x - sg.position.x, rig.position.y - sg.position.y, rig.position.z - sg.position.z);
       sg.scale.setScalar(clamp(d / 45, .5, 2.6)); sg.userData.m.opacity = 1;
-      sg.userData.stem.rotation.y = sg.rotation.y;
+      if (sg.userData.stem) sg.userData.stem.rotation.y = sg.rotation.y;
     });
     hotspots.forEach((h, i) => {
-      const d = rig.position.distanceTo(h.pos), s = clamp(d * .05, 1.8, 9), ph = reduce ? 0 : ((now / 1000 + i * .6) % 1.8) / 1.8;
-      h.sp.scale.set(s, s, 1); h.ring.scale.set(s * (1 + ph * .9), s * (1 + ph * .9), 1); h.ring.material.opacity = reduce ? .5 : .75 * (1 - ph);
+      const d = rig.position.distanceTo(h.pos), s = clamp(d * .036, .45, 6), ph = reduce ? 0 : ((now / 1000 + i * .6) % 1.8) / 1.8;
+      h.sp.scale.set(s, s, 1); h.ring.visible = false; h.sp.visible = !(h.aside && d < 5); h.ring.scale.set(s * (1 + ph * .9), s * (1 + ph * .9), 1); h.ring.material.opacity = reduce ? .5 : .75 * (1 - ph);
     });
     renderer.render(scene, camera);
     requestAnimationFrame(frame);
   }
-  grain(); resize(); setView("in");
+  grain(); resize(); setView("roof");
   traffic.forEach((c) => { c.g.position.copy(P(c.r, c.t, 0)); c.g.rotation.y = Math.PI - c.t; });
   walkers.forEach((w) => { w.g.position.copy(P(w.r, w.t, 0)); });
   // ---------- loading: one veil until the whole square is ready ----------
@@ -1079,7 +1166,7 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
   }
   const painted = () => new Promise((ok) => { requestAnimationFrame(() => setTimeout(ok, 0)); setTimeout(ok, 300); });   // let the screen catch up
   async function download(url, size) {
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: "no-cache" });   // ask the server, a rebuild may have reused the address
     if (!res.ok) throw new Error(url + " " + res.status);
     if (!res.body || !res.body.getReader) return res.arrayBuffer();
     const total = +res.headers.get("content-length") || size, reader = res.body.getReader(), parts = [];
@@ -1093,20 +1180,20 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
   async function modelBytes(stamp) {
     if (window.DecompressionStream) {
       try {
-        let buf = await download("../kikar_web.glb.gz?t=" + stamp, 2465268);
+        let buf = await download("../kikar_web.glb.gz?t=" + stamp, 5692567);
         const sig = new Uint8Array(buf, 0, 2);                          // a server may already have unpacked it on the way
         if (sig[0] === 0x1f && sig[1] === 0x8b) buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
         return buf;
       } catch (e) { console.warn("packed model failed, using the plain one", e); }
     }
-    return download("../kikar.glb?t=" + stamp, 9120284);
+    return download("../kikar.glb?t=" + stamp, 21449824);
   }
   async function reveal() {                                             // shaders compiled and one frame drawn: lift the veil
     if (shown) return;
     progress(.98, "מדליקים את האור"); await painted();
     renderer.compile(scene, camera); await painted(); await painted();
     progress(1); shown = true;
-    veilLoad.classList.add("done"); setTimeout(() => { veilLoad.hidden = true; }, 700);
+    veilLoad.classList.add("done"); setTimeout(() => { veilLoad.hidden = true; showHint(); }, 700);
   }
   function loadFailed(e) {
     console.error(e);
@@ -1179,7 +1266,7 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
         if (!o.isMesh) return;
         o.castShadow = o.receiveShadow = true;
         const m = o.material;
-        if (m.alphaTest > 0) o.castShadow = false;            // every mesh that uses a cut-out, not only the first
+        if (m.alphaTest > 0 || m.transparent) o.castShadow = false;            // every mesh that uses a cut-out, not only the first
         if (done.has(m)) return;
         done.add(m);
         if (m.alphaTest > 0) m.side = THREE.DoubleSide;
@@ -1191,14 +1278,19 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
       });
       scene.add(g.scene);
       collect(g.scene);
+      obstacles(g.scene);
+      signposts(g.scene);
       merge(g.scene);
       shadows(g.scene);
+      paint(g.scene);
+      nightReady(g.scene);
+      walkingFigures(t);
       reveal();
     }, loadFailed);
   }
   // ---------- building labels (cream plates, so they are not mistaken for street names) + Esther card ----------
-  const LABELS = { B: ["קולנוע כיכר דיזנגוף", "לימים קולנוע אסתר"], D: ["בתי פלדמן וגרינמן", "1935-36 · המיקום לאימות"],
-                   F: ["בית מירנברג", "1936 · ג'ניה אוורבוך · המיקום לאימות"] };
+  const LABELS = { B: ["קולנוע כיכר דיזנגוף", "לימים קולנוע אסתר"], D: ["בתי פלדמן וגרינמן", "לילנפלד וביז'ונסקי · 1935-36"],
+                   F: ["בית מירנברג", "תכנון: ג'ניה אוורבוך · 1936"] };
   const labelTex = (name, sub) => canvasTex(896, 320, (x) => {
     rr(x, 6, 6, 884, 308, 34); x.fillStyle = "rgba(244,234,208,.93)"; x.fill();
     x.strokeStyle = "#9a7b3f"; x.lineWidth = 7; rr(x, 22, 22, 852, 276, 24); x.stroke();
@@ -1220,23 +1312,16 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
     let list = [];
     try { list = await (await fetch("labels.json?t=" + Date.now(), { cache: "no-store" })).json(); } catch (e) { return; }
     list.forEach((b) => {
-      const y = b.top + 4.2, W = 6.4, H = 2.29, x = b.x, z = -b.y;
-      const s = new THREE.Group(); s.position.set(x, y, z); scene.add(s);
+      const y = b.top + 3.6, W = 6.4, H = 2.29, x = b.x, z = -b.y;
+      const s = new THREE.Group(); s.position.set(x - b.nx * 6, y, z + b.ny * 6); scene.add(s); s.userData.keep = true;   // over the middle of the block
       const m = new THREE.MeshBasicMaterial({ map: labelTex(...LABELS[b.key]), transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
       s.userData.m = m; s.add(new THREE.Mesh(new THREE.PlaneGeometry(W, H), m));
-      const h = y - H / 2, stem = new THREE.Mesh(new THREE.PlaneGeometry(.1, h), new THREE.MeshBasicMaterial({ map: fadeTex, color: 0xffd98a, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
-      stem.position.set(x, h / 2, z); scene.add(stem); s.userData.stem = stem; signs.push(s);
-      const dot = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: padTex, color: 0xffd98a, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
-      dot.position.set(x, .13, z); scene.add(dot);
+      signs.push(s);
       if (b.key === "B") {
         const out = new THREE.Vector3(b.nx, 0, -b.ny), at = new THREE.Vector3(x, 5.6, z).addScaledVector(out, 1.4);
-        addHotspot("esther", "person", at, new THREE.Vector3(x, 1.7, z).addScaledVector(out, 26), new THREE.Vector3(x, 7.5, z));
-        const hs = hotspots[hotspots.length - 1];
-        hs.sp.material.map = canvasTex(128, 128, (c) => {
-          c.fillStyle = "rgba(236,223,192,.96)"; c.beginPath(); c.arc(64, 64, 60, 0, 7); c.fill();
-          c.fillStyle = "#4a3425"; c.beginPath(); c.arc(64, 64, 51, 0, 7); c.fill();
-          c.fillStyle = "#f0e3c2"; c.font = "700 76px " + SERIF; c.fillText("i", 64, 68);
-        });
+        const tower = new THREE.Vector3(49.5, 0, -4.9);                  // the wall with the name sign and the poster
+        addHotspot("esther", "person", at, tower.clone().addScaledVector(out, 25).setY(9), tower.clone().setY(10.2));
+        hotspots[hotspots.length - 1].aside = true;
       }
     });
   })();
@@ -1255,7 +1340,7 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
       else if (n.startsWith("pram_")) w = 0.75 / 18.9;
       else if (n.startsWith("kidbike_")) w = 2.3 / 20.3;
       else if (n.startsWith("cycle_")) w = 3.6 / 36.7;
-      if (!w) return;
+      if (!w && !n.startsWith("idle_")) return;
       const nose = new THREE.Vector3(1, 0, 0).applyQuaternion(o.quaternion);          // Blender forward is +X
       const sign = Math.sign(nose.x * p.z - nose.z * p.x) || 1;                        // drive nose first
       movers.push({ o, w: w * sign, y: p.y, bob, ph: Math.random() * 6 });
@@ -1306,7 +1391,7 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
       root.add(one);
     });
   }
-  camera.near = .4; camera.updateProjectionMatrix();
+  camera.near = Number((location.search.match(/[?&]near=([0-9.]+)/) || [])[1]) || .4; camera.updateProjectionMatrix();   // ?near=3 : more depth precision, to compare
   window.__kikar.renderer = renderer; window.__kikar.camera = camera;      // for checking the load from the console
   function moveTraffic(now, dt) {
     if (reduce && cam.mode !== "ride") return;            // a ride was asked for, so it drives even with reduced motion
@@ -1314,17 +1399,19 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
       m.o.position.applyAxisAngle(UP, m.w * dt);
       m.o.quaternion.premultiply(turn.setFromAxisAngle(UP, m.w * dt));
       if (m.bob) m.o.position.y = m.y + Math.abs(Math.sin(now / 160 + m.ph)) * .035;
+      if (m.poses) stepWalker(m, dt);
+      if (m.idle) stepIdle(m, dt);
     });
     placeShadows();
   }
-  const BUILD = 1795692568;
+  const BUILD = 1795799621;
   setInterval(async () => {
     try {
       const v = await (await fetch("build.json?t=" + Date.now(), { cache: "no-store" })).json();
       if (v.build > BUILD) location.replace("index.html?v=" + v.build);
     } catch (e) { /* hosted copy or offline: keep what is loaded */ }
   }, 5000);
-  let stamp = 1795692549;
+  let stamp = 1795781363;
   loadModel(stamp);                                   // at once, the check below is only for rebuilds
   (async function poll() {
     try {
@@ -1371,11 +1458,311 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
   }
   canvas.addEventListener("webglcontextrestored", () => { renderer.shadowMap.needsUpdate = true; });
 
+// ---------- walking figures ----------
+  // Blender bakes one ring of poses for every walker and cyclist (people_polyfork.py). The model's second UV set
+  // says (vertex number, which ring). Each pose becomes a geometry that shares the triangles and colours, and a
+  // walker steps through them by the distance it has covered, its flat shadow with it. No skeleton in the browser.
+  async function walkingFigures(stamp) {
+    if (!window.DecompressionStream) return;                          // very old browser: they glide in one pose
+    let rings;
+    for (const cache of ["no-cache", "reload"]) {                     // a copy caught half written during a rebuild is fetched anew
+      try {
+        let buf = await (await fetch("../people_walk.json.gz?t=" + stamp, { cache })).arrayBuffer();
+        const sig = new Uint8Array(buf, 0, Math.min(2, buf.byteLength));   // a server may already have unpacked it
+        if (sig[0] === 0x1f && sig[1] === 0x8b) buf = await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
+        rings = JSON.parse(new TextDecoder().decode(buf));
+        break;
+      } catch (e) { console.warn("walking poses failed to load", e); }
+    }
+    if (!rings) return;
+    const made = new Map();
+    movers.forEach((m) => {
+      const base = m.o.isMesh && m.o.geometry;
+      if (!base || !base.attributes.uv2) return;
+      const own = rings[Math.round(base.attributes.uv2.getY(0))];
+      if (own && own.seconds) {                                       // standing: the graphics card blends the poses
+        if (!ringFits(base, own)) { console.warn("idle poses do not match this model"); return; }
+        breathe(m.o, ringPoses(base, own));
+        m.idle = own.seconds; m.step = Math.random() * own.seconds;
+        return;
+      }
+      let poses = made.get(base);
+      if (!poses) {
+        const ring = rings[Math.round(base.attributes.uv2.getY(0))];
+        if (!ring || !ringFits(base, ring)) { console.warn("walking poses do not match this model"); return; }
+        poses = { stride: ring.stride, list: ringPoses(base, ring) };
+        made.set(base, poses);
+      }
+      m.poses = poses; m.step = Math.random(); m.bob = 0; m.o.position.y = m.y;
+    });
+  }
+  // the first pose is the model itself: a few corners must land where the model has them
+  function ringFits(base, ring) {
+    const raw = atob(ring.data), uv2 = base.attributes.uv2, p = base.attributes.position;
+    const at = (i) => { const n = raw.charCodeAt(2 * i) | (raw.charCodeAt(2 * i + 1) << 8); return (n > 32767 ? n - 65536 : n) / 1024; };
+    for (let j = 0; j < p.count; j += 97) {
+      const v = Math.round(uv2.getX(j));
+      if (v >= ring.verts || Math.abs(at(v * 3) - p.getX(j)) + Math.abs(at(v * 3 + 1) - p.getY(j)) + Math.abs(at(v * 3 + 2) - p.getZ(j)) > .02) return false;
+    }
+    return true;
+  }
+  function ringPoses(base, ring) {
+    const raw = atob(ring.data), size = ring.verts * 3, at = new Int16Array(ring.frames * size);
+    for (let i = 0; i < at.length; i++) at[i] = raw.charCodeAt(2 * i) | (raw.charCodeAt(2 * i + 1) << 8);
+    for (let i = size; i < at.length; i++) at[i] += at[i - size];     // stored as steps from the pose before
+    const uv2 = base.attributes.uv2, count = base.attributes.position.count;
+    return Array.from({ length: ring.frames }, (_, k) => {
+      const pos = new Float32Array(count * 3);
+      for (let j = 0; j < count; j++) {
+        const v = k * size + Math.round(uv2.getX(j)) * 3;
+        pos[j * 3] = at[v] / 1024; pos[j * 3 + 1] = at[v + 1] / 1024; pos[j * 3 + 2] = at[v + 2] / 1024;
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      g.setAttribute("uv", base.attributes.uv);
+      g.setIndex(base.index);
+      g.computeVertexNormals(); g.computeBoundingSphere();
+      return g;
+    });
+  }
+  function breathe(mesh, list) {
+    const g = mesh.geometry.clone();
+    g.morphAttributes.position = list.map((p) => p.attributes.position);
+    mesh.geometry = g;
+    const was = mesh.material;
+    mesh.material = was.clone(); mesh.material.morphTargets = true;
+    mesh.material.onBeforeCompile = was.onBeforeCompile; mesh.material.customProgramCacheKey = was.customProgramCacheKey;   // lamp light (night.js)
+    mesh.updateMorphTargets();
+  }
+  function stepIdle(m, dt) {
+    const w = m.o.morphTargetInfluences, n = w.length;
+    m.step = (m.step + dt) % m.idle;
+    const at = m.step / m.idle * n, a = Math.floor(at) % n;
+    w.fill(0); w[(a + 1) % n] = at - Math.floor(at); w[a] = 1 - (at - Math.floor(at));
+  }
+  function stepWalker(m, dt) {
+    const p = m.poses, r = Math.hypot(m.o.position.x, m.o.position.z);
+    m.step = (m.step + Math.abs(m.w) * r * dt / p.stride) % 1;
+    const g = p.list[Math.floor(m.step * p.list.length)];
+    if (m.o.geometry === g) return;
+    m.o.geometry = g;
+    if (!m.cast) m.cast = casts.find((c) => c.o === m.o);
+    if (m.cast) m.cast.s.geometry = g;
+  }
+
+// ---------- vehicle paint: metal needs something to reflect, so the sky is its environment ----------
+  let carSky = null;
+  function paint(root) {
+    const metal = new Set();
+    root.traverse((o) => { if (o.isMesh && /^(car_|bus_blue)/.test(o.material.name)) metal.add(o.material); });
+    const apply = () => metal.forEach((m) => { m.envMap = carSky; m.envMapIntensity = .75; m.needsUpdate = true; });
+    if (carSky) { apply(); return; }
+    new THREE.TextureLoader().load("sky.jpg", (t) => {
+      const maker = new THREE.PMREMGenerator(renderer);
+      carSky = maker.fromEquirectangular(t).texture; maker.dispose(); t.dispose(); apply();
+    });
+  }
+
+// ---------- walking like in a street map: a white ring runs on the ground, a click glides there ----------
+  const EYE = 1.75, POOL_EDGE = 9.6, STREET_DEG = [348, 43, 98, 168, 225, 299];
+  const ray = new THREE.Raycaster(), floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), -.25), ndc = new THREE.Vector2();
+  const flat = (geo, opacity) => new THREE.Mesh(geo.rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity, depthWrite: false, fog: false,
+    polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 }));
+  const marker = new THREE.Group(); marker.visible = false; scene.add(marker);
+  marker.add(flat(new THREE.RingGeometry(.62, .8, 48), .95), flat(new THREE.CircleGeometry(.62, 48), .22));
+  let mouse = null, goal = null;                                        // mouse: where it hovers. goal: where we are gliding to
+  // may a person stand there? inside the ring of facades, or a little way into one of the six streets
+  function walkable(x, z) {
+    const r = Math.hypot(x, z);
+    if (r <= 45.8) return true;
+    if (r > 75) return false;
+    return STREET_DEG.some((deg) => { const sx = Math.sin(D(deg)), sz = -Math.cos(D(deg)); return x * sx + z * sz > 0 && Math.abs(x * sz - z * sx) <= 3.8; });
+  }
+  // things a visitor must not end up inside: [x, z, how far to stay away] (filled from the model's names)
+  let solids = [];
+  function obstacles(root) {
+    solids = [];
+    root.children.forEach((o) => {
+      const n = o.name, r = n.startsWith("palm") ? 4.4 : n.startsWith("ficus") ? 1.2 : n.startsWith("topiary") ? 1 : n.startsWith("lamp") ? .7 : 0;
+      if (r) solids.push([o.position.x, o.position.z, r]);
+    });
+  }
+  function stepAside(p) {
+    for (let again = 0; again < 4; again++) solids.forEach(([x, z, r]) => {
+      let dx = p.x - x, dz = p.z - z, d = Math.hypot(dx, dz);
+      if (d >= r) return;
+      if (d < .05) { dx = rig.position.x - x; dz = rig.position.z - z; d = Math.hypot(dx, dz) || 1; }
+      p.x = x + dx / d * r; p.z = z + dz / d * r;
+    });
+    return p;
+  }
+  function groundAt(px, py) {
+    camera.updateMatrixWorld(); ndc.set(px / innerWidth * 2 - 1, 1 - py / innerHeight * 2); ray.setFromCamera(ndc, camera);
+    const p = new THREE.Vector3();
+    if (!ray.ray.intersectPlane(floor, p) || !walkable(p.x, p.z)) return null;
+    const r = Math.hypot(p.x, p.z);
+    if (r < POOL_EDGE) {                                                // not into the water: stop at its edge
+      const from = r > .5 ? p : rig.position, k = POOL_EDGE / (Math.hypot(from.x, from.z) || 1);
+      p.set(from.x * k, p.y, from.z * k);
+    }
+    return stepAside(p);
+  }
+  const overSpot = (px, py) => hotspots.some((h) => {
+    const v = h.pos.clone().project(camera);
+    return v.z < 1 && Math.hypot((v.x + 1) / 2 * innerWidth - px, (1 - v.y) / 2 * innerHeight - py) < 30;
+  });
+  const sizeMarker = (p) => { marker.position.copy(p); marker.position.y = .31; marker.scale.setScalar(clamp(rig.position.distanceTo(p) * .032, .75, 2.6)); marker.visible = true; };
+  function walkTo(px, py) {
+    const p = groundAt(px, py); if (!p) return;
+    const f = new THREE.Vector3(); camera.getWorldDirection(f);
+    const from = { pos: rig.position.clone(), yaw: Math.atan2(-f.x, -f.z), pitch: Math.asin(clamp(f.y, -1, 1)), fov: camera.fov };
+    const far = Math.hypot(p.x - from.pos.x, p.z - from.pos.z), high = from.pos.y > 6;
+    const fov = cam.mode === "fp" ? camera.fov : 70;
+    stopMotion(); endGesture(); setPressed(null);
+    if (!gyro.on) { rig.rotation.set(0, 0, 0); look.yaw = from.yaw; look.pitch = from.pitch; }   // with sensors the phone keeps the heading
+    cam.mode = "fp";
+    // the heading stays as it was; coming down from a height the eyes level out
+    const pitch = high || from.pitch < -.5 ? -.05 : from.pitch;
+    goal = p;
+    flight = { t0: performance.now(), dur: reduce ? 1 : clamp(650 + far * 20, 700, 2300), from, h: null,
+      arc: high ? 0 : Math.min(2.4, far * .05),                          // a small hop over hedges and benches
+      to: { pos: new THREE.Vector3(p.x, EYE, p.z), yaw: from.yaw, pitch, fov } };
+  }
+  canvas.addEventListener("pointermove", (e) => { if (e.pointerType === "mouse") mouse = { x: e.clientX, y: e.clientY }; });
+  canvas.addEventListener("pointerleave", () => { mouse = null; });
+  (function follow(now) {
+    if (goal && !flight) goal = null;                                    // arrived, or a finger stopped the glide
+    if (goal) {
+      sizeMarker(goal); marker.scale.multiplyScalar(reduce ? 1 : 1 + .12 * Math.sin(now / 90));
+    } else if (mouse && !ptrs.size) {
+      const spot = overSpot(mouse.x, mouse.y), p = spot ? null : groundAt(mouse.x, mouse.y);
+      if (p) sizeMarker(p); else marker.visible = false;
+      canvas.style.cursor = spot || p ? "pointer" : "grab";
+    } else {
+      marker.visible = false;
+      if (ptrs.size) canvas.style.cursor = "grabbing";
+    }
+    requestAnimationFrame(follow);
+  })(0);
+
+// ---------- on the ground: street names painted on the asphalt, and small blinking dots under the street signs ----------
+  const roadName = (name) => canvasTex(1024, 560, (x) => {
+    x.fillStyle = "rgba(240,229,200,.95)"; x.font = '400 290px "Secular One", "Heebo", sans-serif';
+    x.fillText(name, 512, 292, 980);
+  });
+  const roadNames = [["דיזנגוף", 348], ["ריינס", 43], ["זמנהוף", 98], ["דיזנגוף", 168], ["פינסקר", 225], ["בן עמי", 299]].map(([name, deg]) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(8.4, 4.6).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ map: roadName(name), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    m.position.copy(P(54, D(deg), .06)); m.rotation.y = -D(deg);       // upright for someone looking out from the square
+    scene.add(m); return [m, name];
+  });
+  // a canvas may be drawn before the title font arrives: draw again when it has
+  if (document.fonts) document.fonts.load('400 100px "Secular One"', "אבג").then(() => roadNames.forEach(([m, name]) => { m.material.map = roadName(name); m.material.needsUpdate = true; })).catch(() => {});
+  const blipGeo = new THREE.RingGeometry(.32, .355, 40).rotateX(-Math.PI / 2);
+  function radar(now) {
+    scene.children.forEach((o, i) => {
+      if (!o.userData.pad) return;
+      let r = o.userData.ring;
+      if (!r) {
+        r = o.userData.ring = new THREE.Mesh(blipGeo, new THREE.MeshBasicMaterial({ color: o.material.color, transparent: true, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -5 }));
+        r.position.y = .01; o.add(r);
+      }
+      const t = reduce ? .3 : ((now / 1000 + i * .37) % 1.8) / 1.8;
+      r.scale.setScalar(1 + t * 1.3); r.material.opacity = .75 * (1 - t);
+      o.material.opacity = .62 + .33 * Math.cos(t * 6.283);   // the dot itself blinks softly
+    });
+    if (!reduce) requestAnimationFrame(radar);
+  }
+  requestAnimationFrame(radar);
+  if (reduce) setTimeout(() => radar(0), 1500);                          // still rings, once the building labels exist
+
+// ---------- corner posts with street names: one iron post, one blue enamel blade along each street ----------
+  // A period-style reading: no photo of such a post at this square was found. A post on both corners of all six mouths.
+  const MOUTHS = [[348, "דיזנגוף", "DIZENGOFF ST."], [43, "ריינס", "REINES ST."], [98, "זמנהוף", "ZAMENHOF ST."],
+                  [168, "דיזנגוף", "DIZENGOFF ST."], [225, "פינסקר", "PINSKER ST."], [299, "בן עמי", "BEN AMI ST."]];
+  const RING = { he: "דיזנגוף", en: "DIZENGOFF ST." };      // the road round the square carries Dizengoff's name
+  // [radius, degrees from the street's axis]; the usual place is [45.3, 6.8], the others dodge a lamp or an ad column
+  const MOVED = { "348:-1": [45.3, 8.8], "348:1": [45.3, 8.8], "168:-1": [44.6, 6.8] };
+  const SIGN_H3 = 3.0;                                      // both blades of a post sit level
+  const POSTS = [];
+  MOUTHS.forEach(([street, he, en]) => [-1, 1].forEach((side) => {
+    const [r, off] = MOVED[street + ":" + side] || [45.3, 6.8];
+    POSTS.push({ r, deg: street + side * off, blades: [
+      { he, en, y: SIGN_H3, along: street },                   // runs out into the side street
+      { ...RING, y: SIGN_H3, round: side },                    // runs along the ring, away from the mouth
+    ] });
+  }));
+  const BLADE_L = 1.15, BLADE_H = .43, BLADE_TIP = .15, TEX_H = 284, TEX_W = Math.round(TEX_H * BLADE_L / BLADE_H);
+  // the blade seen from one side: tip = 1 points to the viewer's right, -1 to the left
+  function bladeTex(he, en, tip) {
+    return canvasTex(TEX_W, TEX_H, (x) => {
+      const t = TEX_W * BLADE_TIP / BLADE_L, X = (v) => tip > 0 ? v : TEX_W - v;
+      const outline = (m) => {
+        x.beginPath(); x.moveTo(X(m), m); x.lineTo(X(TEX_W - t - m * .4), m); x.lineTo(X(TEX_W - m * 1.7), TEX_H / 2);
+        x.lineTo(X(TEX_W - t - m * .4), TEX_H - m); x.lineTo(X(m), TEX_H - m); x.closePath();
+      };
+      x.fillStyle = "#1c2c63"; x.fillRect(0, 0, TEX_W, TEX_H);
+      x.strokeStyle = "#f4efe0"; x.lineWidth = 9; outline(17); x.stroke();
+      const mid = X((TEX_W - t * .55) / 2), wide = TEX_W - t - 80;
+      x.fillStyle = "#f7f3e6";
+      const small = "700 74px " + SERIF, big = "900 142px " + SERIF, gap = 20, pre = "רח", tick = 22;     // "street" small, the name large
+      x.font = small; const wr = x.measureText(pre).width, wp = wr + tick; x.font = big; const wn = x.measureText(he).width;
+      const k = Math.min(1, wide / (wp + gap + wn));
+      x.save(); x.translate(mid, 152); x.scale(k, k); x.textAlign = "right"; x.textBaseline = "alphabetic";
+      const right = (wp + gap + wn) / 2;                                                      // reading starts here
+      x.font = small; x.fillText(pre, right, 0);
+      x.strokeStyle = x.fillStyle; x.lineWidth = 8; x.lineCap = "round"; x.beginPath();       // the geresh drawn by hand: the font's looks like a yod
+      x.moveTo(right - wr - 8, -52); x.lineTo(right - wr - 18, -31); x.stroke(); x.font = big; x.fillText(he, right - wp - gap, 0); x.restore();
+      x.font = "700 62px " + SERIF; x.direction = "ltr"; x.fillText(en, mid, 214, wide);
+    });
+  }
+  const bladeShape = (tip) => {                             // in the blade's own plane: the post at x = 0
+    const s = new THREE.Shape(), L = BLADE_L * tip, T = BLADE_TIP * tip, h = BLADE_H / 2;
+    s.moveTo(0, -h); s.lineTo(L - T, -h); s.lineTo(L, 0); s.lineTo(L - T, h); s.lineTo(0, h); s.closePath();
+    return s;
+  };
+  const bladeMaps = {};                                     // each name is drawn once for each side it is seen from
+  function bladeFace(he, en, tip, mats) {
+    const geo = new THREE.ShapeGeometry(bladeShape(tip)), p = geo.attributes.position, uv = geo.attributes.uv;
+    for (let i = 0; i < p.count; i++) uv.setXY(i, p.getX(i) / BLADE_L + (tip > 0 ? 0 : 1), p.getY(i) / BLADE_H + .5);
+    const key = he + tip;
+    if (!bladeMaps[key]) { bladeMaps[key] = bladeTex(he, en, tip); bladeMaps[key].anisotropy = 8; }
+    const map = bladeMaps[key];
+    if (!mats[key]) mats[key] = new THREE.MeshLambertMaterial({ map, emissive: 0xffffff, emissiveMap: map, emissiveIntensity: .3 });   // readable on the shade side too
+    return new THREE.Mesh(geo, mats[key]);
+  }
+  // added to the loaded model before merge(), so all posts cost a handful of draw calls and cast into the one shadow map
+  function signposts(root) {
+    const mats = {}, iron = new THREE.MeshLambertMaterial({ color: 0x25332d }), rim = new THREE.MeshLambertMaterial({ color: 0xe9e3d2 });
+    POSTS.forEach((post) => {
+      const at = P(post.r, D(post.deg), .1);
+      solids.push([at.x, at.z, .55]);                       // a walker steps round it
+      const g = new THREE.Group(); g.name = "signpost"; g.position.copy(at); root.add(g);
+      const part = (geo, mat, y, into) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = m.receiveShadow = true; (into || g).add(m); return m; };
+      const top = Math.max(...post.blades.map((b) => b.y)) + BLADE_H / 2;
+      part(new THREE.CylinderGeometry(.14, .17, .12, 16), iron, .06);                      // foot
+      part(new THREE.CylinderGeometry(.085, .12, .42, 16), iron, .33);
+      part(new THREE.CylinderGeometry(.105, .105, .05, 16), iron, .56);
+      part(new THREE.CylinderGeometry(.048, .062, top, 14), iron, top / 2 + .02);          // shaft
+      part(new THREE.CylinderGeometry(.085, .085, .05, 14), iron, top + .05);              // cap and ball
+      part(new THREE.SphereGeometry(.085, 16, 12), iron, top + .15);
+      part(new THREE.ConeGeometry(.032, .13, 10), iron, top + .28);
+      post.blades.forEach((b) => {
+        const t = D(post.deg), dir = b.along !== undefined ? P(1, D(b.along), 0) : new THREE.Vector3(Math.cos(t), 0, Math.sin(t)).multiplyScalar(b.round);
+        const arm = new THREE.Group(); arm.position.y = b.y; arm.rotation.y = Math.atan2(-dir.z, dir.x); g.add(arm);   // the arm's +x runs along the street
+        const plate = new THREE.ExtrudeGeometry(bladeShape(1), { depth: .026, bevelEnabled: false }); plate.translate(.06, 0, -.013);
+        part(plate, rim, 0, arm);
+        const front = bladeFace(b.he, b.en, 1, mats); front.position.set(.06, 0, .0145); arm.add(front);
+        const back = bladeFace(b.he, b.en, -1, mats); back.position.set(.06, 0, -.0145); back.rotation.y = Math.PI; arm.add(back);
+      });
+      new Set(post.blades.map((b) => b.y)).forEach((y) => [-1, 1].forEach((s) => part(new THREE.CylinderGeometry(.072, .072, .045, 14), iron, y + s * (BLADE_H / 2 - .035))));   // clamps
+    });
+  }
 // ---------- point of interest: the opening of the square, January 1938 ----------
   // Facts: municipal announcement no. 4 (data/research_images/3623f3ae), the film's own captions, and the Israel Film Archive record.
   CARDS.opening = {
     title: "חנוכת כיכר צינה דיזנגוף", by: "26 בינואר 1938", sub: "הסרט: יומן כרמל, נתן אקסלרוד, ינואר 1938",
-    video: "SdrtVZkEUTg", ratio: "4 / 3",
+    video: "SdrtVZkEUTg", ratio: "4 / 3", captions: true,
     body: [
       "הכיכר נחנכה בטקס פומבי ביום רביעי, כ״ד בשבט תרצ״ח, ביום הזיכרון השמיני לצינה דיזנגוף, אשתו של ראש העירייה המנוח מאיר דיזנגוף.",
       "לפי המודעה העירונית על הטקס, העירייה נטעה וסידרה את הכיכר לזכרה, בעזרת תרומות של עובדי העירייה ושל בעלי הבתים והמגרשים שמסביב. הטקס נקבע לשעה 16:30, והכניסה למוזמנים הייתה מרחוב דיזנגוף, מצד רחוב המלך ג׳ורג׳.",
@@ -1391,12 +1778,620 @@ $("info-btn").addEventListener("click", () => { const n = $("notes"); n.hidden =
   };
   // over the near side of the pool: in the middle of the square, and already in sight in the opening view
   addHotspot("opening", "play", P(7.5, D(230), 3.6), P(18.5, D(222), 1.7), P(2, D(230), 3.4));
-  hotspots[hotspots.length - 1].sp.material.map = canvasTex(128, 128, (c) => {
-    c.fillStyle = "rgba(236,223,192,.96)"; c.beginPath(); c.arc(64, 64, 60, 0, 7); c.fill();
-    c.fillStyle = "#4a3425"; c.beginPath(); c.arc(64, 64, 51, 0, 7); c.fill();
-    c.fillStyle = "#f0e3c2"; c.beginPath(); c.moveTo(52, 26); c.lineTo(52, 62); c.lineTo(82, 44); c.closePath(); c.fill();
-    c.direction = "ltr"; c.font = "700 36px " + SERIF; c.fillText("1938", 64, 86);
-  });
 
+// ---------- point of interest: Zina Dizengoff, whose name the square carries ----------
+  // Facts: Hebrew Wikipedia (צינה דיזנגוף) and municipal announcement no. 4 (the date of the ceremony and the
+  // eighth memorial day). Portrait: Zvi Oron, 1920s, Central Zionist Archives, Wikimedia Commons, public domain.
+  {
+    const file = "https://commons.wikimedia.org/wiki/", name = "ZinaDizenghof22.jpg";
+    const p = (t) => `<p>${esc(t)}</p>`;
+    CARDS.zina = {
+      title: "צינה דיזנגוף", by: "האישה שעל שמה הכיכר", sub: "1872 עד 1930",
+      body: [],
+      extra: `<figure class="beside" style="width:9.5rem"><a href="${file}File:${name}" target="_blank" rel="noopener"><img src="${file}Special:FilePath/${name}?width=330" alt="דיוקן של צינה דיזנגוף" onerror="this.closest('figure').remove()"></a><figcaption>צילום: צבי אורון, שנות ה־20, עותק מעובד. הארכיון הציוני, ויקישיתוף, נחלת הכלל.</figcaption></figure>`
+        + p("צינה דיזנגוף הייתה אשתו של מאיר דיזנגוף, ראש העירייה הראשון של תל אביב. היא מתה בפברואר 1930. אחרי מותה תרם בעלה את ביתם להקמת מוזיאון לאמנות בעיר.")
+        + p("הכיכר נחנכה ב־26 בינואר 1938, ביום הזיכרון השמיני למותה. מאיר דיזנגוף לא ראה את הטקס: הוא נפטר ב־1936."),
+      credit: "מקורות: ויקיפדיה העברית, ומודעה עירונית מס׳ 4 של עיריית תל אביב.",
+      links: [
+        { t: "ויקיפדיה: צינה דיזנגוף", u: "https://he.wikipedia.org/wiki/%D7%A6%D7%99%D7%A0%D7%94_%D7%93%D7%99%D7%96%D7%A0%D7%92%D7%95%D7%A3" },
+        { t: "ויקיפדיה: כיכר צינה דיזנגוף", u: WIKI_SQ }
+      ]
+    };
+  }
+  // over the lawn on the near side of the pool, seen from the walk with the fountain behind it
+  addHotspot("zina", "person", P(12.5, D(138), 3.0), P(21.5, D(137), 1.7), P(4, D(140), 2.6));
+  hotspots[hotspots.length - 1].aside = true;
+
+// ---------- point of interest: how the square changed, from the 1934 plan to today ----------
+  // Facts: Hebrew Wikipedia (כיכר צינה דיזנגוף). First evening: Haaretz, 27.1.1938, as quoted by golden-lotus.co.il.
+  // The 1940s parade: the typed caption on the print itself. Photographs are loaded from Wikimedia Commons,
+  // each under the licence written beneath it, so nothing is copied into the (public) repository.
+  {
+    const commons = "https://commons.wikimedia.org/wiki/";
+    const photo = (name, alt, cap) => `<figure class="shot"><a href="${commons}File:${encodeURIComponent(name)}" target="_blank" rel="noopener"><img src="${commons}Special:FilePath/${encodeURIComponent(name)}?width=500" alt="${alt}" loading="lazy" onerror="this.closest('figure').remove()"></a><figcaption>${cap}</figcaption></figure>`;
+    const era = (year, title, text, pictures) => `<h3>${year} · ${title}</h3><p>${text}</p>${pictures || ""}`;
+    CARDS.levels = {
+      title: "הכיכר שעולה ויורדת", by: "הגלגולים שלה לאורך השנים", sub: "מ־1934 עד היום",
+      body: ["אותו מעגל, כמה כיכרות שונות. בסצנה רואים את הראשונה: שטוחה, בגובה הרחוב. לחיצה על תצלום פותחת אותו בגדול."],
+      extra:
+        era("1934", "ההגבהה שנדחתה", "ג'ניה אוורבוך זכתה בתחרות לעיצוב הכיכר. בתוכנית המקורית הכיכר הייתה אמורה לעמוד כמטר מעל סביבתה, ומתחתיה תחנת מוניות וחניה. בגלל העלות הגבוהה ומיעוט כלי הרכב הוחלט לדחות את זה לעתיד.",
+          `<figure class="shot"><img src="${IMG_PLAN}" alt="תוכנית אוורבוך לסידור הכיכר" loading="lazy" onerror="this.parentNode.remove()"><figcaption>תוכנית אוורבוך לסידור הכיכר. ידיעות עיריית תל אביב.</figcaption></figure>`)
+        + era("1938", "החנוכה", "ב־26 בינואר 1938 נחנכה הכיכר: מעגל תנועה בקוטר של כ־66 מטר, ובמרכזו בריכה ומזרקה, דשא, שבילים וערוגות. לפי עיתון הארץ מהבוקר שאחרי, הגן הואר אז לראשונה בלילה והמזרקה זהרה באורות צבעוניים.",
+          photo("110274 tel aviv - dizengoff square PikiWiki Israel.png", "הכיכר והמזרקה בשנות השלושים", "שנות ה־30. צלם לא ידוע, ויקישיתוף, נחלת הכלל."))
+        + era("שנות ה־40", "מקום של טקסים", "על התצלום מוקלד Soldiers' Day, יום החייל: טורי חיילים צועדים בכיכר וקהל גדול מסביב. התאריך המדויק לא ידוע.",
+          photo("109688 tel aviv - dizengoff square PikiWiki Israel.png", "חיילים צועדים בכיכר דיזנגוף", "1941 עד 1943. צלם לא ידוע, ויקישיתוף, נחלת הכלל."))
+        + era("1948", "הגן גדל", "העצים והדקלים צמחו והכיכר נעשתה גן מוצל. הבניינים האחרונים סביבה הושלמו רק בשנות ה־50, ובמרץ 1959 נפתח בה כלבו המשביר לצרכן.",
+          photo("PikiWiki Israel 46886 Dizengoff Square in Tel Aviv.jpg", "צמחייה גבוהה והמזרקה", "1948 עד 1951. צלם לא ידוע, ויקישיתוף, נחלת הכלל."))
+        + era("1976", "הכיכר עולה", "ביולי 1976 התחילו העבודות, בתכנון האדריכל צבי לישר. רחוב דיזנגוף עבר ישר מתחת, והכיכר נבנתה מעליו. היא נחנכה ב־25 ביולי 1978.",
+          photo("Building the new circle on Dizengoff street in Tel Aviv (FL46002932).jpg", "הכיכר המוגבהת בבנייה מעל הכביש", "14 ביוני 1978. צילום: דני גוטפריד, אוסף דן הדני, הספרייה הלאומית, ויקישיתוף, CC BY 4.0."))
+        + era("1978", "קשתות זכוכית", "במרכז הבריכה החדשה, שנבנתה בממדי המקורית, הוצב פסל של אלן דוד: שלוש קשתות זכוכית ובתוכן מזרקה.",
+          photo("Building the new circle on Dizengoff street in Tel Aviv (FL62628168).jpg", "פסל הקשתות במרכז הבריכה", "1978. צלם IPPA, אוסף דן הדני, הספרייה הלאומית, ויקישיתוף, CC BY 4.0."))
+        + era("1986", "אש ומים", "ביולי 1986 הוחלף הפסל ב״אש ומים״, פסל קינטי של יעקב אגם.",
+          photo("כיכר דיזנגוף - אתרי מורשת בתל אביב 2016 (9).jpg", "מזרקת אגם מוארת בלילה", "צולם ב־2016. צילום: Chenspec, ויקישיתוף, CC BY-SA 4.0."))
+        + era("2017", "הכיכר יורדת", "ב־2016 החליטה העירייה להחזיר את הכיכר למתכונתה המקורית. ההריסה התחילה בינואר 2017, ובנובמבר 2018 הסתיימו העבודות והפסל של אגם חזר.",
+          photo("PikiWiki Israel 51775 dizengoff square - period of excavations.jpg", "הכיכר בזמן העבודות", "2018. צילום: שאולה הייטנר, ויקישיתוף (פיקיוויקי), CC BY 2.5."))
+        + era("היום", "שוב בגובה הרחוב", "הכיכר שוב שטוחה. התצלום נעשה מבניין קולנוע אסתר, היום מלון.",
+          photo("115057 zina dizengoff square day and night PikiWiki Israel.jpg", "הכיכר בלילה במבט מלמעלה", "2024. צילום: שלמה רודד, ויקישיתוף (פיקיוויקי), CC BY 2.5.")),
+      credit: "מקורות: ויקיפדיה העברית, כיכר צינה דיזנגוף. הציטוט מעיתון הארץ לפי אתר לוטוס הזהב.",
+      links: [
+        { t: "ויקיפדיה: כיכר צינה דיזנגוף", u: WIKI_SQ },
+        { t: "לוטוס הזהב: כיכר צינה דיזנגוף", u: "https://golden-lotus.co.il/zina/" }
+      ]
+    };
+  }
+  // over the lawn on the north-west side of the pool
+  addHotspot("levels", "person", P(12.5, D(318), 3.0), P(21.5, D(317), 1.7), P(4, D(320), 2.6));
+  hotspots[hotspots.length - 1].aside = true;
+
+// ---------- Genia Averbuch's card: the portrait beside the text, the plan where the text talks about it ----------
+  {
+    const [age, code, plan, cafe, contest] = CARDS.genia.body, [portrait, drawing] = CARDS.genia.figs;
+    const p = (t) => `<p>${esc(t)}</p>`;
+    const fig = (f, cls) => `<figure class="${cls}"><img src="${f.src}" alt="${esc(f.alt)}"><figcaption>${esc(f.cap)}</figcaption></figure>`;
+    Object.assign(CARDS.genia, {
+      body: [], figs: [],
+      extra: fig(portrait, "beside") + p(age) + p(code) + p(plan.replace("בתוכנית שלמעלה", "בתוכנית שלה")) + fig(drawing, "after") + p(cafe) + p(contest)
+    });
+  }
+
+// ---------- Hebrew captions over the dedication film ----------
+  // The film is silent about its own words on YouTube, so the site lays one line at a time over the player
+  // (text: data/dizengoff_opening_he_fixed.srt, put in by make_site.py). YouTube's own captions stay off.
+  const CAPTIONS = [[16.6, 18.76, "כיכר צינה דיזנגוף,"], [18.76, 21.279, "שנחנכה השבוע ברוב עם,"], [21.279, 24.263, "נמסרה לרשות הקהל התל אביבי"], [24.263, 25.64, "כשהיא מסודרה"], [25.64, 27.051, "לנוי ולתפארת."], [27.051, 29.439, "בין שטיחי הדשא וערוגות"], [29.439, 32.85, "הפרחים ניטעו גם עצי תמרים"], [32.85, 34.76, "שהובאו מגן רחל"], [34.76, 38.184, "בכנרת. 28 ספסלים לבנים,"], [38.184, 40.12, "מזרקת מים יפה"], [40.12, 43.293, "ופנסים יפים שיאירו בכל ערב"], [43.293, 44.879, "ישמשו את הקהל"], [44.879, 47.719, "למנוחתו."]];
+  let youtube = null;
+  const youtubeApi = () => youtube || (youtube = new Promise((ok, no) => {
+    if (window.YT && window.YT.Player) return ok();
+    window.onYouTubeIframeAPIReady = ok;
+    const s = document.createElement("script"); s.src = "https://www.youtube.com/iframe_api";
+    s.onerror = () => { youtube = null; no(); };
+    document.head.appendChild(s);
+  }));
+  function playWithCaptions(button, c) {
+    const film = document.createElement("div"); film.className = "film";
+    film.innerHTML = '<div></div><p class="cap" aria-live="polite"></p>';
+    button.replaceWith(film);
+    const plain = () => { film.innerHTML = `<iframe src="https://www.youtube-nocookie.com/embed/${c.video}?autoplay=1&rel=0" title="${esc(c.title)}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>`; };
+    youtubeApi().then(() => {
+      if (!film.isConnected) return;                                   // the card was closed meanwhile
+      const line = film.querySelector(".cap");
+      const player = new YT.Player(film.firstChild, {
+        host: "https://www.youtube-nocookie.com", videoId: c.video,
+        playerVars: { autoplay: 1, rel: 0, playsinline: 1, fs: 0, cc_load_policy: 0, iv_load_policy: 3 },   // no full screen: it would leave the captions behind
+        events: { onStateChange: () => { player.unloadModule("captions"); player.unloadModule("cc"); } }
+      });
+      const tick = setInterval(() => {
+        if (!film.isConnected) { clearInterval(tick); return; }
+        if (!player.getCurrentTime) return;
+        const t = player.getCurrentTime(), now = CAPTIONS.find((x) => t >= x[0] && t < x[1]);
+        const text = now ? now[2] : "";
+        if (line.textContent !== text) line.textContent = text;
+      }, 150);
+    }).catch(plain);
+  }
+
+// ---------- the cinema card: its two names and the films of 1939-40 ----------
+  // Screening dates and Hebrew titles: "Jerusalem Segal project", Tel Aviv Cinematheque library and archive
+  // (cinema.co.il, table of screenings). Robin Hood: Davar, 28.4.1939, as quoted by golden-lotus.co.il.
+  // Posters: Wikimedia Commons files marked public domain (the American posters, not the local ones).
+  {
+    const commons = "https://commons.wikimedia.org/wiki/";
+    const poster = (file, name) => `<a href="${commons}File:${encodeURIComponent(file)}" target="_blank" rel="noopener"><img src="${commons}Special:FilePath/${encodeURIComponent(file)}?width=330" alt="כרזת הסרט ${name}" loading="lazy" onerror="this.parentNode.remove()"><span>${name}</span></a>`;
+    const PROGRAMME = "כרטיס לסרט שלגייה ושבעת הגמדים.jpg";
+    const films = (year, list) => `<h4>${year}</h4><ul class="films">${list.map(([day, he, en]) => `<li><time>${day}</time><span>${he}<bdi>${en}</bdi></span></li>`).join("")}</ul>`;
+    Object.assign(CARDS.esther, {
+      sub: "נפתח ב־30 במרץ 1939",
+      body: [
+        "הבניין נבנה ב־1938 עד 1939 עבור אסתר ומשה נתנאל, בתכנון האדריכל יהודה מגידוביץ' ובנו, המהנדס רפאל מגידו. הוא עומד על עמודים, עם חזית קעורה ומרפסות סרט.",
+        "הקולנוע נפתח בשם קולנוע כיכר דיזנגוף. אחרי שנתו הראשונה שונה שמו לקולנוע אסתר, על שם אסתר נתנאל. המקורות לא נותנים תאריך מדויק לשינוי.",
+        "באולם היו כ־1,000 מקומות, והוא תואר כראשון בארץ עם מיזוג אוויר מרכזי. בבניין פעלו קפה אמנות עם רחבת ריקודים וחנות הכלבו אקמן. ב־1998 הוסב הבניין למלון."
+      ],
+      extra: `<h3>תוכניית ערב הפתיחה</h3>
+        <figure class="programme"><a href="${commons}File:${encodeURIComponent(PROGRAMME)}" target="_blank" rel="noopener"><img src="${commons}Special:FilePath/${encodeURIComponent(PROGRAMME)}" alt="תוכניית הפתיחה של קולנוע כיכר דיזנגוף, מרץ 1939, בעברית ובאנגלית" loading="lazy" onerror="this.closest('figure').remove()"></a><figcaption>צילום: דני גולדשמיד, ויקישיתוף, CC BY-SA 3.0. לחיצה פותחת בגדול.</figcaption></figure>
+        <p>בערב הפתיחה, 30 במרץ 1939, בחסות ראש העירייה ישראל רוקח: יומן פרמאונט, קטעי הווי מהארץ, סרט קצר, הפסקה, ואז שלגיה ושבעת הגמדים. בהצגות היומיות בחג הפסח הוקרן שירת המיסיסיפי עם בובי ברין.</p>
+        <h3>על המסך</h3>
+        <div class="posters">${poster("Snow White and the Seven Dwarfs (Style B) poster.jpg", "שלגיה ושבעת הגמדים")}${poster("The Adventures of Robin Hood (1938 poster).jpg", "רובין הוד")}${poster("Fourdaughters1938.JPG", "חלומות נעורים")}</div>
+        ${films("1939", [
+          ["1.4", "שלגיה ושבעת הגמדים", "Snow White and the Seven Dwarfs"],
+          ["2.4", "שירת המיסיסיפי", "Rainbow on the River"],
+          ["אפריל", "הרפתקאותיו של רובין הוד", "The Adventures of Robin Hood"],
+          ["6.5", "חלומות נעורים", "Four Daughters"],
+          ["29.7", "ארבעה בגן", "Four's a Crowd"],
+          ["26.8", "עמק הנפילים", "Valley of the Giants"],
+          ["9.9", "דגלים לבנים", "White Banners"],
+          ["21.10", "הפונדק העליז", "Room Service"],
+          ["9.12", "הפלוגה האובדת", "The Lost Patrol"]])}
+        ${films("1940", [
+          ["17.2", "עוד נחיה יחד", "Next Time We Love"],
+          ["25.5", "מסעות טופר", "Topper Takes a Trip"],
+          ["13.7", "הנערה ממקסיקו", "The Girl from Mexico"],
+          ["7.9", "מאה השנים הראשונות", "The First Hundred Years"],
+          ["30.11", "קפה סוסייטי", "Café Society"]])}
+        <p>שלט המתכת על הקיר בסצנה הוא עיצוב של השחזור. בגלויה מהתקופה נראות שם אותיות אדומות אנכיות. הכרזה שמתחתיו היא הכרזה האמריקאית של חלומות נעורים, לא הכרזה שנתלתה בקולנוע. הכרזה על המרפסת עם שמה של אליזבת ברגנר מופיעה בגלויה.</p>`,
+      credit: "מבחר מתוך רשומות ההקרנה בפרויקט ירושלים סגל, הספרייה לקולנוע והארכיון בסינמטק תל אביב. רובין הוד לפי עיתון דבר, ושירת המיסיסיפי לפי תוכניית הפתיחה. הכרזות הן הכרזות האמריקאיות, מוויקישיתוף, בנחלת הכלל.",
+      links: [
+        { t: "ויקיפדיה: קולנוע אסתר", u: "https://he.wikipedia.org/wiki/%D7%A7%D7%95%D7%9C%D7%A0%D7%95%D7%A2_%D7%90%D7%A1%D7%AA%D7%A8" },
+        { t: "טבלת ההקרנות של ארכיון סינמטק תל אביב", u: "https://www.cinema.co.il/wp-content/uploads/2025/01/%D7%A4%D7%A8%D7%95%D7%99%D7%A7%D7%98-%D7%99%D7%A8%D7%95%D7%A9%D7%9C%D7%99%D7%9D-%D7%A1%D7%92%D7%9C-.pdf" },
+        { t: "לוטוס הזהב: קולנוע אסתר", u: "https://golden-lotus.co.il/esther/" }
+      ]
+    });
+  }
+
+// ---------- "about the project" pop-up: how it was made, what is exact, who made it ----------
+  const LINKEDIN = "https://www.linkedin.com/in/meet-yuval-cohen/";
+  const WHATSAPP = "972512868309";        // international form, digits only. The number is never shown, the button opens a chat
+  function openAbout() {
+    // pictures with archive photographs live in about/archive (not published yet): a missing one removes its own frame
+    const shot = (src, cap) => `<figure class="shot"><img src="../about/${src}.webp" alt="${cap}" loading="lazy" onerror="const li = this.closest('li'); this.parentNode.remove(); if (li && li.dataset.needs && !li.querySelector('figure')) li.remove();"><figcaption>${cap}</figcaption></figure>`;
+    const step = (title, text, pictures, needs) => `<li${needs ? ' data-needs="1"' : ""}><h4>${title}</h4><p>${text}</p>${pictures || ""}</li>`;
+    const social = (url, label, icon) => `<a href="${url}" target="_blank" rel="noopener" aria-label="${label}" title="${label}"><i class="fa-brands ${icon}" aria-hidden="true"></i></a>`;
+    card.innerHTML = `<div class="head"><div><h2 id="card-title">אודות הפרויקט</h2><p class="by">כיכר צינה דיזנגוף, מהחנוכה ב־1938</p></div><button class="x" id="card-x" aria-label="סגירה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div><div class="scroll">
+      <p class="lead">שחזור תלת־ממדי של הכיכר בשנים הראשונות שלה. בתוכה מחכות נקודות מידע על הרגעים והאנשים המרכזיים: לחצו על אחת מהן וגלו את הסיפור.</p>
+      <section class="creator">
+        <div class="who"><img src="../about/yuval.webp" alt="" width="34" height="34"><h4>אודות היוצר: יובל כהן</h4></div>
+        <p>חוקר עולמות תלת־ממד וטכנולוגיה וחובב היסטוריה מושבע. ניסיתי להחזיר את הכיכר לחיים, כדי שאפשר יהיה לעמוד בתוכה ולגלות אותה מחדש.</p>
+        <div class="socials">${social(LINKEDIN, "לינקדאין", "fa-linkedin-in")}${WHATSAPP ? social("https://wa.me/" + WHATSAPP, "וואטסאפ", "fa-whatsapp") : ""}</div>
+      </section>
+      <h3>איך זה נבנה</h3>
+      <ol class="steps">
+        ${step("מחקר", "מתי נבנתה הכיכר, מי תכנן אותה ואיך נראתה. היא נחנכה ב־26 בינואר 1938 לפי תוכנית של ג'ניה אוורבוך. נאספו עשרות תצלומים בשחור לבן מזוויות שונות, פריימים מיומן קולנוע ומודעה עירונית, ומוינו לפי תקופה: מה מתאים ל־1940 ומה מאוחר יותר.")}
+        ${step("אז מול היום", "מפת OpenStreetMap של היום הושוותה לתצלומי התקופה: צורות הבניינים, כיווני הרחובות ושמות הבתים. ששת בנייני הטבעת סומנו A עד F, וכל אחד קיבל חזית משלו. הקולנוע הותאם לתצלומים, ושאר החזיתות הן פרשנות.",
+          shot("map", "ששת בנייני הטבעת והרחובות. © תורמי OpenStreetMap") + shot("archive/corners", "סימון פינות ופרטי חזית על גבי תצלומים") + shot("archive/facades", "חזיתות: תצלום מול הניסיון הראשון"))}
+        ${step("צבע לתחושה", "תצלומים בשחור לבן נצבעו בבינה מלאכותית. הצבעים מומצאים ולא מדויקים, אבל הם נתנו תחושה של איך זה היה נראה ועזרו מאוד לשפר את הסצנה.",
+          shot("archive/colour_square", "למעלה התצלום, למטה הגרסה הצבועה") + shot("archive/colour_street", "אותה פינה, בשחור לבן ובצבע"))}
+        ${step("גרסה ראשונה בדפדפן", "בהתחלה הכול נבנה ישירות ב־Three.js, בקוד, בלי Blender. כך נבדקו הפריסה, המידות והתנועה בכיכר.",
+          shot("facelift", "גלגולי הגרסה הראשונה, לפני ואחרי"))}
+        ${step("המעבר ל־Blender", "כשהבסיס ב־Three.js היה טוב מספיק, חובר Blender דרך MCP, ומשם כל השלבים נעשו בו: קודם גושים לפי המפה, אחר כך טבעות הגן, ולבסוף חזיתות באוהאוס, צמחייה, מזרקה, רכבים ואנשים.",
+          shot("massing", "הגושים הראשונים ב־Blender") + shot("early", "הגן מתחיל לקבל צורה") + shot("render", "רינדור מתוך הכיכר"))}
+        ${step("מדידה מתוך תצלומים", "מצלמה וירטואלית הותאמה לזווית של תצלום, ורשת וקווים הונחו עליו עד שהתיישבו. כך יצאו בריכה ברדיוס של כ־8.4 מטר ומדשאה פנימית עד כ־16 מטר.",
+          shot("archive/measure", "קווי המדידה, על תצלום מאוחר מ־1940") + shot("archive/grid_square", "רשת מדידה על תצלום המזרקה") + shot("archive/grid_cinema", "רשת מדידה על תצלום הקולנוע"))}
+        ${step("תצלום מול שחזור", "אותה זווית מצלמה: למעלה התצלום, למטה השחזור. כך רואים מה כבר דומה ומה עוד לא.",
+          shot("archive/compare_square", "הבריכה, הגדר והטבעות. זיהוי הרחוב בתצלום הזה לא ודאי") + shot("archive/compare_cinema", "קולנוע כיכר דיזנגוף. התצלום מאוחר מ־1940"), true)}
+        ${step("אל הדפדפן", "הדגם יוצא בחזרה לאתר שרץ ב־Three.js, ונדחס לכ־6 מגה כדי להיטען מהר גם בטלפון. הכלים: Blender, Three.js, OpenStreetMap ו־Claude Code.")}
+      </ol>
+      <h3>מה מדויק ומה משוער</h3>
+      ${$("notes").querySelector("ul").outerHTML}
+      <section class="share-end"><h3>נהניתם לטייל בהיסטוריה בתלת־ממד?</h3><p>שתפו את הכיכר עם מי שיאהב אותה.</p><button class="share-btn" id="card-share">שיתוף</button></section>
+      <section class="rights"><h3>זכויות יוצרים וקרדיטים</h3>
+      <ul>
+        <li>תצלומים בחלונות המידע: ויקישיתוף, ובהם פיקיוויקי, אוסף דן הדני בספרייה הלאומית והארכיון הציוני. שם הצלם והרישיון מופיעים ליד התצלומים. מקור דיוקנה של ג'ניה אוורבוך לא זוהה.</li>
+        <li>תוכנית אוורבוך לכיכר: ידיעות עיריית תל אביב.</li>
+        <li>סרט חנוכת הכיכר: אוסף יומני כרמל (נתן אקסלרוד), ארכיון הסרטים הישראלי. הסרטונים מוצגים בנגן המוטמע של YouTube.</li>
+        <li>רשומות ההקרנה: פרויקט ירושלים סגל, סינמטק תל אביב. כרזות הסרטים: ויקישיתוף, נחלת הכלל.</li>
+        <li>מפת הבניינים והרחובות: © תורמי <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener"><bdi>OpenStreetMap</bdi></a>, רישיון ODbL.</li>
+        <li>שמיים: <a href="https://polyhaven.com" target="_blank" rel="noopener"><bdi>Poly Haven</bdi></a>, רישיון CC0. תלת־ממד: <a href="https://threejs.org" target="_blank" rel="noopener"><bdi>Three.js</bdi></a>, רישיון MIT. אייקונים: <a href="https://fontawesome.com/license/free" target="_blank" rel="noopener"><bdi>Font Awesome Free</bdi></a>. גופנים: Google Fonts, רישיון OFL.</li>
+        <li>איורי חזיתות החנויות והגרסאות הצבועות של התצלומים נוצרו בבינה מלאכותית.</li>
+      </ul>
+      <p class="credit">הדמויות מבוססות על הדגמים <a href="https://polyfork.dev/asset/audience-gentleman-base" target="_blank" rel="noopener"><bdi>Audience gentleman</bdi></a>, <a href="https://polyfork.dev/asset/human-vest-shorts-base" target="_blank" rel="noopener"><bdi>Human vest shorts</bdi></a>, <a href="https://polyfork.dev/asset/taverna-waiter-base" target="_blank" rel="noopener"><bdi>Taverna waiter</bdi></a>, <a href="https://polyfork.dev/asset/older-woman-with-a-basket-base" target="_blank" rel="noopener"><bdi>Older woman with a basket</bdi></a>, <a href="https://polyfork.dev/asset/teen-audience-member-base" target="_blank" rel="noopener"><bdi>Teen audience member</bdi></a>, <a href="https://polyfork.dev/asset/child-at-the-fun-fair-base" target="_blank" rel="noopener"><bdi>Child at the fun fair</bdi></a> מאת <a href="https://polyfork.dev" target="_blank" rel="noopener"><bdi>Polyfork</bdi></a>, ברישיון <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener"><bdi>CC BY 4.0</bdi></a>. הדגמים שונו: צבעים, לבוש, כובעים, תנוחות והפחתת פרטים.</p>
+      <p class="credit">זכויות היוצרים בתצלומים, בסרטים ובחומרי הארכיון שמורות לבעליהן. לתיקון קרדיט או להסרה אפשר לפנות בוואטסאפ שבראש החלון.</p></section>
+    </div>`;
+    card.hidden = false; $("veil").hidden = false; $("notes").hidden = true;
+    $("card-x").addEventListener("click", closeCard); $("card-share").addEventListener("click", (e) => share(e.currentTarget)); $("card-x").focus({ preventScroll: true });
+    setBar(true);
+  }
+
+  // ---------- sharing the square: from the round button and from the end of "about" ----------
+  const SHARE = { title: "כיכר צינה דיזנגוף 1940", text: "מכירים את כיכר דיזנגוף? לא ככה. שחזור תלת־ממדי של הכיכר כמו שנראתה סביב 1940. מסתובבים בה ישר מהטלפון." };
+  function copyText(text) {                                  // the clipboard API needs https or localhost
+    if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+    const t = document.createElement("textarea"); t.value = text; t.style.cssText = "position:fixed;opacity:0";
+    document.body.appendChild(t); t.select();
+    const ok = document.execCommand("copy"); t.remove();
+    return ok ? Promise.resolve() : Promise.reject(new Error("copy"));
+  }
+  function share(button) {
+    const url = location.origin + location.pathname.replace(/index\.html$/, "");
+    // the bar, with its hint, is out of sight while a card is open: then the pressed button says it
+    const say = (text) => { if (button) button.textContent = text; else { hintEl.textContent = text; showHint(); } };
+    const copy = () => copyText(SHARE.text + "\n" + url).then(() => say("הקישור הועתק"), () => say("העתיקו את הקישור משורת הכתובת"));
+    if (!navigator.share) return copy();
+    navigator.share({ title: SHARE.title, text: SHARE.text, url }).catch((e) => { if (e.name !== "AbortError") copy(); });
+  }
+  $("quick-share").addEventListener("click", () => share());
+// ---------- night: the sky darkens, a full moon climbs over the roofs, warm lamps, coloured lights in the pool ----------
+  // No real lights are added (phones): the day's two lights are turned down, lamp light is a painted map of the
+  // ground that every material reads, and everything that glows is a sprite. Haaretz of 27.1.1938 saw the fountain
+  // in coloured lights; which colours is not known, the four here are a choice.
+  // One clock runs from day (0) to night (END): the sky turns first, then the lights come on one after another,
+  // the moon jumps up from under the roofs and the clouds form around it. Going back, the same clock runs fast.
+  const NIGHT = { on: false, T: 0, last: 0, raf: 0, root: null, el: .2, az: 0, made: false };
+  const END = 3.2, BACK = .8;                               // seconds to full night, and back to day
+  const stage = (at, dur) => { const x = clamp((NIGHT.T - at) / dur, 0, 1); return x * x * (3 - 2 * x); };
+  const hop = (x) => { if (x <= 0) return 0; if (x >= 1) return 1; const u = x - 1; return 1 + 2.3 * u * u * u + 1.3 * u * u; };     // arrives a touch too high, settles
+  const uNight = { value: 0 }, uNightT = { value: 0 }, uPool = { value: 0 }, uLampMap = { value: null }, uLampOn = { value: new THREE.Vector3() };
+  const MOON_R = 430, MOON_D = 2 * MOON_R * Math.tan(D(1.9));            // about 3.8 degrees across: large, not a cartoon
+  const GLSL_PAL = `vec3 pal(float t){ float s = fract(t)*4.0, f = smoothstep(0.0, 1.0, fract(s));
+    vec3 c0 = vec3(1.0,.24,.2), c1 = vec3(1.0,.66,.2), c2 = vec3(.2,.9,.55), c3 = vec3(.28,.52,1.0);
+    return s < 1.0 ? mix(c0,c1,f) : s < 2.0 ? mix(c1,c2,f) : s < 3.0 ? mix(c2,c3,f) : mix(c3,c0,f); }`;
+  const PAL = [0xff3d33, 0xffa833, 0x33e68c, 0x4785ff].map((c) => new THREE.Color(c));
+  const pal = (t, out) => { const s = (((t % 1) + 1) % 1) * 4, i = Math.floor(s), f = s - i; return out.copy(PAL[i % 4]).lerp(PAL[(i + 1) % 4], f * f * (3 - 2 * f)); };
+  const nEase = (x) => x * x * (3 - 2 * x);
+  const paintedTex = (w, h, draw) => { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d")); return new THREE.CanvasTexture(c); };
+  const glowTex = (stops) => paintedTex(128, 128, (x) => { const g = x.createRadialGradient(64, 64, 0, 64, 64, 64); stops.forEach(([at, c]) => g.addColorStop(at, c)); x.fillStyle = g; x.fillRect(0, 0, 128, 128); });
+  const glowSprite = (map, color, w, h, order) => { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map, color, transparent: true, opacity: 0, depthWrite: false, fog: false, blending: THREE.AdditiveBlending })); s.scale.set(w, h, 1); s.renderOrder = order; return s; };
+  function seeded(n) { let s = n; return () => (s = (s * 16807) % 2147483647) / 2147483647; }
+
+  function moonThings() {                                   // moon, halo, thin clouds and stars ride with the sky dome
+    const rnd = seeded(1938);
+    const face = paintedTex(256, 256, (x) => {
+      x.save(); x.beginPath(); x.arc(128, 128, 124, 0, 7); x.clip();
+      const g = x.createRadialGradient(112, 108, 10, 128, 128, 126); g.addColorStop(0, "#fffbee"); g.addColorStop(.75, "#f3ead2"); g.addColorStop(1, "#d9cfb6");
+      x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+      const blot = (cx, cy, rx, ry, a) => { x.save(); x.translate(cx, cy); x.scale(rx, ry); const b = x.createRadialGradient(0, 0, 0, 0, 0, 1); b.addColorStop(0, "rgba(128,126,122," + a + ")"); b.addColorStop(.6, "rgba(128,126,122," + a * .75 + ")"); b.addColorStop(1, "rgba(128,126,122,0)"); x.fillStyle = b; x.beginPath(); x.arc(0, 0, 1, 0, 7); x.fill(); x.restore(); };
+      [[92, 76, 40, 32, .5], [138, 70, 26, 22, .46], [162, 100, 30, 26, .5], [178, 132, 18, 24, .42], [66, 118, 30, 46, .38], [104, 148, 26, 20, .3], [152, 158, 14, 14, .26], [196, 88, 11, 15, .4]].forEach((b) => blot(...b));
+      for (let i = 0; i < 240; i++) blot(rnd() * 256, rnd() * 256, 1.5 + rnd() * 6, 1.5 + rnd() * 6, .06 + rnd() * .14);
+      x.fillStyle = "rgba(255,253,244,.8)"; x.beginPath(); x.arc(112, 204, 4, 0, 7); x.fill();
+      x.restore();
+    });
+    const wisps = paintedTex(512, 192, (x) => {
+      for (let i = 0; i < 110; i++) {
+        const cx = 70 + rnd() * 372, cy = 96 + (rnd() - .5) * 70 + Math.sin(cx / 60) * 14, rx = 24 + rnd() * 62, ry = 3 + rnd() * 9;
+        x.save(); x.translate(cx, cy); x.scale(rx, ry);
+        const g = x.createRadialGradient(0, 0, 0, 0, 0, 1); g.addColorStop(0, "rgba(176,190,226," + (.05 + rnd() * .1) + ")"); g.addColorStop(1, "rgba(176,190,226,0)");
+        x.fillStyle = g; x.beginPath(); x.arc(0, 0, 1, 0, 7); x.fill(); x.restore();
+      }
+    });
+    const halo = glowSprite(glowTex([[0, "rgba(190,208,255,.55)"], [.22, "rgba(170,192,250,.26)"], [1, "rgba(150,175,240,0)"]]), 0xffffff, MOON_D * 4.6, MOON_D * 4.6, -9);
+    const disc = new THREE.Sprite(new THREE.SpriteMaterial({ map: face, transparent: true, opacity: 0, depthWrite: false, fog: false })); disc.scale.set(MOON_D, MOON_D, 1); disc.renderOrder = -8;
+    const cloud = new THREE.Sprite(new THREE.SpriteMaterial({ map: wisps, transparent: true, opacity: 0, depthWrite: false, fog: false })); cloud.scale.set(MOON_D * 6.4, MOON_D * 2.4, 1); cloud.renderOrder = -7;
+    const pos = new Float32Array(420 * 3);
+    for (let i = 0; i < 420; i++) { const a = rnd() * 6.283, y = .07 + rnd() * .9, r = Math.sqrt(1 - y * y); pos.set([Math.cos(a) * r * 460, y * 460, Math.sin(a) * r * 460], i * 3); }
+    const sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    const stars = new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xdde5ff, map: glowTex([[0, "rgba(255,255,255,1)"], [.35, "rgba(255,255,255,.85)"], [1, "rgba(255,255,255,0)"]]), size: 3 * Math.min(2, devicePixelRatio || 1), sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false }));
+    stars.renderOrder = -9.5; stars.frustumCulled = false;
+    [stars, halo, disc, cloud].forEach((o) => sky.add(o));
+    Object.assign(NIGHT, { disc, halo, cloud, stars });
+    // coloured projectors lying in the pool
+    const spot = glowTex([[0, "rgba(255,255,255,1)"], [.2, "rgba(255,255,255,.55)"], [1, "rgba(255,255,255,0)"]]);
+    NIGHT.spots = Array.from({ length: 8 }, (_, i) => { const s = glowSprite(spot, 0xffffff, 2.3, 1.15, 2); const a = i * Math.PI / 4; s.position.set(Math.cos(a) * 3.1, WATER_Z + .22, Math.sin(a) * 3.1); scene.add(s); return s; });
+    // the fountain's drops take the colour of the light under them; the water does the same
+    fountain.material.onBeforeCompile = (sh) => {
+      Object.assign(sh.uniforms, { uPool, uNightT });
+      sh.vertexShader = "uniform float uNightT; varying vec3 vTint;\n" + GLSL_PAL + "\n" + sh.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>
+        float rr = length(position.xz), turn = atan(position.z, position.x + .0001) / 6.2832;
+        vec3 tint = rr < 1.1 ? pal(uNightT*.045 + .5 + position.y*.035) : pal(turn + uNightT*.045);
+        vTint = tint * mix(1.25, .55, smoothstep(0.0, 8.5, position.y));`);
+      sh.fragmentShader = "uniform float uPool; varying vec3 vTint;\n" + sh.fragmentShader.replace("vec4 diffuseColor = vec4( diffuse, opacity );", "vec4 diffuseColor = vec4( mix(diffuse, vTint, uPool), opacity );");
+    };
+    fountain.material.needsUpdate = true;
+    Object.assign(waterMat.uniforms, { uNight, uNightT, uPool });
+    waterMat.fragmentShader = waterMat.fragmentShader.replace("uniform float uT;", "uniform float uT; uniform float uNight; uniform float uNightT; uniform float uPool;\n" + GLSL_PAL + "\n")
+      .replace("gl_FragColor = vec4(col, 1.0);", `if (uNight > 0.0) {
+        vec3 dark = col * vec3(.09,.14,.27);
+        for (int k = 0; k < 8; k++) { float a = float(k)*.7854; vec2 d = p - vec2(cos(a), sin(a))*3.1; float d2 = dot(d, d);
+          dark += pal(float(k)/8.0 + uNightT*.045) * (exp(-d2*.85)*.62 + exp(-d2*7.0)*.55) * (.9 + .1*c) * uPool; }
+        dark += pal(uNightT*.045 + .5) * exp(-r*r*.55) * .6 * uPool;
+        col = mix(col, dark, uNight);
+      }
+      gl_FragColor = vec4(col, 1.0);`);
+    waterMat.needsUpdate = true;
+    NIGHT.made = true;
+  }
+
+  // ---------- a town that is not blacked out: lit shop fronts, the cinema, windows here and there ----------
+  const ROOM_TONES = [[1, .72, .4], [1, .8, .52], [1, .64, .32], [.96, .86, .66]];
+  function triangles(o, keep) {                             // world triangles of one mesh, with their normals
+    const g = o.geometry, p = g.attributes.position, ix = g.index, n = (ix ? ix.count : p.count) / 3, out = [];
+    for (let t = 0; t < n; t++) {
+      const v = [0, 1, 2].map((q) => new THREE.Vector3().fromBufferAttribute(p, ix ? ix.getX(t * 3 + q) : t * 3 + q).applyMatrix4(o.matrixWorld));
+      const nm = new THREE.Vector3().subVectors(v[2], v[1]).cross(v[0].clone().sub(v[1])), area = nm.length() / 2;
+      if (area > 1e-4 && (!keep || keep(v))) out.push({ v, n: nm.normalize(), area });
+    }
+    return out;
+  }
+  function joined(tris) {                                   // triangles that share a corner are one pane
+    const parent = tris.map((_, i) => i), find = (i) => parent[i] === i ? i : (parent[i] = find(parent[i])), seen = new Map();
+    tris.forEach((t, i) => t.v.forEach((v) => { const k = Math.round(v.x * 50) + "," + Math.round(v.y * 50) + "," + Math.round(v.z * 50); if (seen.has(k)) parent[find(i)] = find(seen.get(k)); else seen.set(k, i); }));
+    const groups = new Map();
+    tris.forEach((t, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(t); });
+    return [...groups.values()];
+  }
+  const roomTex = () => paintedTex(256, 64, (x) => {        // four rooms side by side: bare, curtains, blinds, someone inside
+    for (let k = 0; k < 4; k++) {
+      const a = k * 64, g = x.createRadialGradient(a + 32, 24, 4, a + 32, 30, 48); g.addColorStop(0, "#ffffff"); g.addColorStop(1, "#9a9a9a"); x.fillStyle = g; x.fillRect(a, 0, 64, 64);
+      x.fillStyle = "rgba(0,0,0,.45)";
+      if (k === 1) { x.beginPath(); x.moveTo(a, 0); x.lineTo(a + 24, 0); x.quadraticCurveTo(a + 8, 30, a + 14, 64); x.lineTo(a, 64); x.fill(); x.beginPath(); x.moveTo(a + 64, 0); x.lineTo(a + 40, 0); x.quadraticCurveTo(a + 56, 30, a + 50, 64); x.lineTo(a + 64, 64); x.fill(); }
+      if (k === 2) for (let y = 2; y < 40; y += 6) x.fillRect(a, y, 64, 2.5);
+      if (k === 3) { x.beginPath(); x.arc(a + 42, 34, 8, 0, 7); x.fill(); x.beginPath(); x.ellipse(a + 42, 62, 14, 20, 0, 0, 7); x.fill(); }
+      x.fillStyle = "rgba(0,0,0,.62)"; x.fillRect(a + 30.5, 0, 3, 64); x.fillRect(a, 17, 64, 2.5); x.fillRect(a, 0, 2, 64); x.fillRect(a + 62, 0, 2, 64);
+    }
+  });
+  function cityLights(root, spill) {
+    const rnd = seeded(2611), glass = [], walls = [], moving = new Set();
+    movers.forEach((m) => m.o.traverse((c) => moving.add(c)));
+    const shops = new Map(), signs = new Map();
+    root.traverse((o) => {
+      if (!o.isMesh || moving.has(o)) return;
+      const name = o.material.name;
+      if (name === "glass") glass.push(...triangles(o, (v) => Math.hypot(v[0].x, v[0].z) > 45.5));
+      else if (name === "plaster" || name === "wall_white") walls.push(...triangles(o, (v) => Math.hypot(v[0].x, v[0].z) > 62));
+      else if (name.indexOf("shop_") === 0) {
+        const m = o.material;
+        shops.set(m, m.userData.day || (m.userData.day = m.emissive.clone()));
+        triangles(o).forEach((t) => {
+          if (Math.abs(t.n.y) > .3) return;
+          const x = (t.v[0].x + t.v[1].x + t.v[2].x) / 3, z = (t.v[0].z + t.v[1].z + t.v[2].z) / 3;
+          spill.push([x + t.n.x * 1.5, z + t.n.z * 1.5]);
+        });
+      } else if (/^(poster|poster_four|signs)$/.test(name) && o.material.map) signs.set(o.material, name === "signs" ? .24 : name === "poster_four" ? .62 : .5);
+      else if (name === "cine_sign") NIGHT.letters = o.material;
+    });
+    signs.forEach((_, m) => { if (!m.emissiveMap) { m.emissiveMap = m.map; m.needsUpdate = true; } });       // black by day, so nothing shows
+    const pos = [], uv = [], col = [], rooms = [];
+    const quad = (c, t, n, w, h, offs, tone, level, variant, upper) => {          // one room: a quad on each face given
+      const room = { at: pos.length / 3, count: offs.length * 6, tone, level, now: level, upper, on: 1.5 + rnd() * 1.3 }, u0 = variant / 4 + .002, u1 = u0 + .246;
+      offs.forEach((off) => [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]].forEach(([i, j]) => {
+        pos.push(c.x + t.x * i * w / 2 + n.x * off, c.y + j * h / 2, c.z + t.z * i * w / 2 + n.z * off);
+        uv.push(i < 0 ? u0 : u1, j < 0 ? 0 : 1); col.push(0, 0, 0);
+      }));
+      rooms.push(room);
+    };
+    const tone = () => ROOM_TONES[rnd() < .1 ? 3 : Math.floor(rnd() * 3)];
+    const glassBand = (ts, y0, y1) => {
+      const room = { at: pos.length / 3, count: 0, tone: ROOM_TONES[0], level: .72, now: .72, upper: false, on: 1.9 };
+      ts.forEach((tr) => {
+        if (Math.abs(tr.n.y) > .3) return;
+        const mx = (tr.v[0].x + tr.v[1].x + tr.v[2].x) / 3, mz = (tr.v[0].z + tr.v[1].z + tr.v[2].z) / 3, out = tr.n.x * mx + tr.n.z * mz < 0 ? 2 : -2;
+        spill.push([mx + tr.n.x * out, mz + tr.n.z * out]);               // toward the square
+        [.03, -.03].forEach((off) => tr.v.forEach((v) => {
+          pos.push(v.x + tr.n.x * off, v.y, v.z + tr.n.z * off); uv.push(.07, .2 + .65 * (v.y - y0) / (y1 - y0 || 1)); col.push(0, 0, 0); room.count++;
+        }));
+      });
+      if (room.count) rooms.push(room);
+    };
+    joined(glass).forEach((ts) => {
+      const pts = ts.flatMap((t) => t.v), ys = pts.map((p) => p.y), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      const main = ts.reduce((a, b) => Math.abs(b.n.y) < .3 && (Math.abs(a.n.y) >= .3 || b.area > a.area) ? b : a, ts[0]);
+      const n = main.n.clone().setY(0).normalize(), t = new THREE.Vector3(-n.z, 0, n.x);
+      const along = pts.map((p) => p.dot(t)), deep = pts.map((p) => p.dot(n)), w = Math.max(...along) - Math.min(...along), d = Math.max(...deep) - Math.min(...deep);
+      if (w > 3.2 && y0 < 3) { glassBand(ts, y0, y1); return; }            // the cinema lobby and other long glass at street level
+      if (w > 3.2 || d > .7 || y1 - y0 > 2.4 || w < .35 || y1 - y0 < .6) return;      // otherwise single windows only
+      const c = t.clone().multiplyScalar((Math.max(...along) + Math.min(...along)) / 2).addScaledVector(n, (Math.max(...deep) + Math.min(...deep)) / 2).setY((y0 + y1) / 2);
+      const level = rnd() < (y0 > 4 ? .34 : .6) ? .55 + rnd() * .35 : 0;
+      quad(c, t, n, w * .9, (y1 - y0) * .9, [d / 2 + .035, -d / 2 - .035], tone(), level, Math.floor(rnd() * 4), y0 > 4);
+    });
+    // the houses further out have blank walls: a few windows are painted on them with light alone
+    const taken = new Set();
+    walls.forEach((tr) => {
+      if (Math.abs(tr.n.y) > .2) return;
+      const n = tr.n.clone().setY(0).normalize(), t = new THREE.Vector3(-n.z, 0, n.x);
+      const u = tr.v.map((v) => v.dot(t)), y = tr.v.map((v) => v.y), lo = Math.min(...u), hi = Math.max(...u), top = Math.max(...y), plane = tr.v[0].dot(n);
+      if (hi - lo < 3) return;
+      const side = (a, b, px, py) => (u[b] - u[a]) * (py - y[a]) - (y[b] - y[a]) * (px - u[a]);
+      for (let px = Math.ceil(lo / 3.4) * 3.4; px < hi - .9; px += 3.4) {
+        if (px < lo + .9) continue;
+        for (let py = 2; py < top - 1; py += 3.2) {
+          const a = side(0, 1, px, py), b = side(1, 2, px, py), c = side(2, 0, px, py);
+          if (!((a >= 0 && b >= 0 && c >= 0) || (a <= 0 && b <= 0 && c <= 0))) continue;
+          const key = Math.round(px) + "," + Math.round(py) + "," + Math.round(plane);
+          if (taken.has(key)) continue;
+          taken.add(key);
+          const ground = py < 3, lit = rnd() < (ground ? .22 : .17);
+          if (!lit && rnd() > .04) continue;                // a few dark ones are kept too: they may come on later
+          const at = t.clone().multiplyScalar(px).addScaledVector(n, plane).setY(py);
+          quad(at, t, n, ground ? 2.2 : 1.05, ground ? 1.7 : 1.35, [.06], tone(), lit ? .4 + rnd() * .3 : 0, Math.floor(rnd() * 3), !ground);
+        }
+      }
+    });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: roomTex(), vertexColors: true, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    mesh.frustumCulled = false; mesh.visible = false;
+    if (NIGHT.rooms) scene.remove(NIGHT.rooms.mesh);
+    scene.add(mesh);
+    NIGHT.rooms = { mesh, list: rooms, next: 0, turning: [] };
+    cinemaLights(root);
+    rooms.forEach(paintRoom);
+    Object.assign(NIGHT, { shops, signs });
+  }
+  // three thin arms reach out from the cinema's roof with a small projector each: a gentle warm wash on the sign and the poster
+  function cinemaLights(root) {
+    const middle = (name) => { const box = new THREE.Box3(); let first = null; root.traverse((o) => { if (o.isMesh && o.material.name === name) triangles(o).forEach((t) => { t.v.forEach((v) => box.expandByPoint(v)); first = first || t; }); }); return first && { box, at: box.getCenter(new THREE.Vector3()), n: first.n }; };
+    if (NIGHT.cinema) scene.remove(NIGHT.cinema.all);
+    NIGHT.cinema = null;
+    const sign = middle("cine_sign"), onWall = middle("cine_shadow");
+    if (!sign || !onWall) return;
+    const n = sign.n.clone().setY(0).normalize();
+    if (n.dot(sign.at) > 0) n.negate();                    // toward the square
+    const t = new THREE.Vector3(-n.z, 0, n.x), wall = onWall.at.dot(n), mid = sign.at.dot(t), roof = sign.box.max.y - 1;
+    const point = (along, y, out) => t.clone().multiplyScalar(mid + along).addScaledVector(n, wall + out).setY(y);
+    const all = new THREE.Group(); scene.add(all);
+    const iron = new THREE.MeshLambertMaterial({ color: 0x25332d });
+    const lens = new THREE.MeshBasicMaterial({ color: 0x4a4438 });
+    const rod = (a, b, r) => {
+      const d = b.clone().sub(a), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, d.length(), 8), iron);
+      m.position.copy(a).addScaledVector(d, .5); m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize()); m.castShadow = true; all.add(m); return m;
+    };
+    const glow = glowTex([[0, "rgba(255,214,160,.95)"], [.25, "rgba(255,178,100,.35)"], [1, "rgba(255,160,80,0)"]]), heads = [];
+    [-1.75, 0, 1.75].forEach((o) => {
+      const foot = point(o, roof - .2, -.45), knee = point(o, roof + 1.55, -.45), tip = point(o, roof + 1.8, 2.2), aim = point(o * .7, 11.5, 0);
+      rod(foot, knee, .045); rod(knee, tip, .035);
+      const dir = aim.clone().sub(tip).normalize();
+      const can = new THREE.Mesh(new THREE.CylinderGeometry(.2, .09, .36, 14, 1, true), iron); can.material.side = THREE.DoubleSide;
+      can.position.copy(tip).addScaledVector(dir, .1); can.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir); all.add(can);
+      const face = new THREE.Mesh(new THREE.CircleGeometry(.17, 14), lens);
+      face.position.copy(tip).addScaledVector(dir, .27); face.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir); all.add(face);
+      const h = glowSprite(glow, 0xffffff, 1.15, 1.15, 3); h.position.copy(tip).addScaledVector(dir, .36); all.add(h); heads.push(h);
+    });
+    const washTex = paintedTex(256, 512, (x) => {
+      x.fillStyle = "#000"; x.fillRect(0, 0, 256, 512); x.globalCompositeOperation = "lighter";
+      [58, 128, 198].forEach((cx) => { x.save(); x.translate(cx, 150); x.scale(1, 3.1); const g = x.createRadialGradient(0, 0, 0, 0, 0, 74); g.addColorStop(0, "rgba(255,255,255,.5)"); g.addColorStop(.5, "rgba(255,255,255,.24)"); g.addColorStop(1, "rgba(255,255,255,0)"); x.fillStyle = g; x.fillRect(-90, -90, 180, 180); x.restore(); });
+    });
+    const low = 4.6, high = roof - .05, wash = new THREE.Mesh(new THREE.PlaneGeometry(6.2, high - low),
+      new THREE.MeshBasicMaterial({ map: washTex, color: 0xffb168, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    wash.position.copy(point(0, (low + high) / 2, .035)); wash.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n); all.add(wash);
+    renderer.shadowMap.needsUpdate = true;
+    NIGHT.cinema = { all, heads, wash, lens };
+  }
+
+  function paintRoom(r) {
+    const c = NIGHT.rooms.mesh.geometry.attributes.color, v = r.now * stage(r.on, .16);
+    for (let i = 0; i < r.count; i++) c.setXYZ(r.at + i, r.tone[0] * v, r.tone[1] * v, r.tone[2] * v);
+    c.needsUpdate = true;
+  }
+  // every few seconds, somewhere, one window quietly comes on or goes out
+  function someoneAtHome(t, dt) {
+    const R = NIGHT.rooms;
+    if (t > R.next) {
+      if (R.next) {
+        const round = Math.random() < .75;                   // mostly in the houses on the square, where it can be seen
+        const ups = R.list.filter((r) => r.upper && (!round || r.count === 12)), r = ups[Math.floor(Math.random() * ups.length)];
+        if (r) { r.level = r.level ? 0 : .6 + Math.random() * .25; R.turning.push(r); }
+      }
+      R.next = t + 5 + Math.random() * 7;
+    }
+    R.turning = R.turning.filter((r) => { r.now += Math.sign(r.level - r.now) * Math.min(Math.abs(r.level - r.now), dt * .7); paintRoom(r); return r.now !== r.level; });
+  }
+
+  function lampThings(root) {                               // find the lamp globes in the model, paint their light, hang a halo on each
+    root.updateMatrixWorld(true);
+    const heads = [], v = new THREE.Vector3(), mats = new Set(), globes = new Set();
+    root.traverse((o) => {
+      if (!o.isMesh) return;
+      mats.add(o.material);
+      if (o.material.name !== "globe") return;
+      globes.add(o.material);
+      const p = o.geometry.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        v.set(p.getX(i), p.getY(i), p.getZ(i)).applyMatrix4(o.matrixWorld);
+        let h = heads.find((h) => Math.hypot(h.x / h.n - v.x, h.z / h.n - v.z) < 1.2);
+        if (!h) heads.push(h = { x: 0, y: 0, z: 0, n: 0 });
+        h.x += v.x; h.y += v.y; h.z += v.z; h.n++;
+      }
+    });
+    const spill = [];
+    cityLights(root, spill);
+    const place = (h) => ({ x: h.x / h.n, y: h.y / h.n, z: h.z / h.n });
+    const around = heads.map(place).filter((h) => Math.hypot(h.x, h.z) < 40).sort((a, b) => Math.atan2(a.x, -a.z) - Math.atan2(b.x, -b.z));
+    const away = heads.map(place).filter((h) => Math.hypot(h.x, h.z) >= 40).sort((a, b) => Math.hypot(a.x, a.z) - Math.hypot(b.x, b.z));
+    const half = Math.ceil(around.length / 2), waves = [around.slice(0, half), around.slice(half), away], WAVE = [.75, 1.05, 1.35];
+    const ink = (wave, a) => "rgba(" + (wave === 0 ? 255 : 0) + "," + (wave === 1 ? 255 : 0) + "," + (wave === 2 ? 255 : 0) + "," + a + ")";
+    uLampMap.value = paintedTex(1024, 1024, (x) => {        // 256 m across, centred on the fountain
+      x.fillStyle = "#000"; x.fillRect(0, 0, 1024, 1024); x.globalCompositeOperation = "lighter";
+      const pool = (wx, wz, R, wave, stops) => {
+        const cx = (wx + 128) * 4, cy = (wz + 128) * 4, g = x.createRadialGradient(cx, cy, 0, cx, cy, R);
+        stops.forEach(([at, a]) => g.addColorStop(at, ink(wave, a))); x.fillStyle = g; x.fillRect(cx - R, cy - R, R * 2, R * 2);
+      };
+      waves.forEach((list, w) => list.forEach((h) => pool(h.x, h.z, h.y * 15, w, [[0, .46], [.25, .36], [.5, .21], [.76, .08], [1, 0]])));
+      [0, 1].forEach((w) => pool(0, 0, 220, w, [[0, .075], [.7, .075], [1, 0]]));       // the square itself is never quite dark
+      spill.forEach(([sx, sz]) => pool(sx, sz, 17, 2, [[0, .13], [.55, .055], [1, 0]]));   // light falling out of the shop windows
+    });
+    if (NIGHT.lamps) scene.remove(NIGHT.lamps);
+    NIGHT.lamps = new THREE.Group(); scene.add(NIGHT.lamps);
+    const soft = glowTex([[0, "rgba(255,184,104,.66)"], [.16, "rgba(255,164,80,.34)"], [.5, "rgba(255,148,62,.09)"], [1, "rgba(255,140,56,0)"]]);      // amber, never a white glare
+    waves.forEach((list, w) => list.forEach((h, j) => {
+      const s = glowSprite(soft, 0xffffff, 2.9, 2.9, 3); s.position.set(h.x, h.y, h.z); s.userData.at = WAVE[w] - .08 + .3 * j / list.length; NIGHT.lamps.add(s);
+    }));
+    mats.forEach((m) => {
+      if (!m.isMeshStandardMaterial && !m.isMeshLambertMaterial) return;
+      const before = m.onBeforeCompile, key = m.name.indexOf("leafcard") === 0 ? "lamp-leaf" : "lamp";
+      m.onBeforeCompile = (sh, r) => {
+        if (before) before.call(m, sh, r);
+        Object.assign(sh.uniforms, { uNight, uLampMap, uLampOn });
+        sh.vertexShader = "varying vec3 vLampW;\n" + sh.vertexShader.replace("#include <project_vertex>", "#include <project_vertex>\n vLampW = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+        sh.fragmentShader = "uniform float uNight; uniform sampler2D uLampMap; uniform vec3 uLampOn; varying vec3 vLampW;\n" + sh.fragmentShader.replace("#include <tonemapping_fragment>",
+          `if (uNight > 0.0) {
+             float lampLit = min(.72, dot(texture2D(uLampMap, vec2(vLampW.x/256.0 + .5, .5 - vLampW.z/256.0)).rgb, uLampOn)) * (1.0 - smoothstep(3.8, 8.5, vLampW.y));
+             gl_FragColor.rgb += (diffuseColor.rgb*.82 + .025) * vec3(1.0,.64,.34) * lampLit;
+           }
+           #include <tonemapping_fragment>`);
+      };
+      m.customProgramCacheKey = () => key;
+      m.needsUpdate = true;
+    });
+    Object.assign(NIGHT, { root, globes: [...globes], glowing: [...mats].filter((m) => m.isMeshLambertMaterial && m.emissiveMap) });
+  }
+
+  const DAY = { haze: new THREE.Color(HAZE), tint: new THREE.Color(.12, .165, .31), sky: new THREE.Color(0xeaf2fb), ground: new THREE.Color(0xb4b0a6), sun: new THREE.Color(0xffedd2) };
+  const DARK = { sky: new THREE.Color(0x8497d0), ground: new THREE.Color(0x4c475a), moon: new THREE.Color(0x9fb2ea), globe: new THREE.Color(.74, .46, .2), shop: new THREE.Color(1.08, .9, .66) };
+  const mixed = new THREE.Color(), white = new THREE.Color(1, 1, 1);
+  function nightPaint() {
+    const k = stage(0, .8), pool = stage(2.1, .7), lit = k > 0;
+    uNight.value = k; uPool.value = pool; uLampOn.value.set(stage(.75, .3), stage(1.05, .3), stage(1.35, .35));
+    const dome = sky.children[0].material;
+    if (dome.map) dome.color.copy(white).lerp(DAY.tint, k);
+    mixed.copy(DAY.haze).multiply(white.clone().lerp(DAY.tint, k));
+    scene.fog.color.copy(mixed); renderer.setClearColor(mixed, 1);
+    scene.children.forEach((o) => { if (o.isHemisphereLight) { o.color.copy(DAY.sky).lerp(DARK.sky, k); o.groundColor.copy(DAY.ground).lerp(DARK.ground, k); o.intensity = .56 + .08 * k; } });
+    sun.color.copy(DAY.sun).lerp(DARK.moon, k); sun.intensity = .88 - .48 * k;
+    if (casts[0]) casts[0].s.material.opacity = .38 - .26 * k;
+    roadNames.forEach(([r]) => r.material.color.setScalar(1 - .58 * k));
+    NIGHT.glowing.forEach((g) => { if (g.emissive.r > .9) g.emissiveIntensity = .3 - .08 * k; });          // the street-name blades
+    NIGHT.globes.forEach((g) => g.emissive.copy(DARK.globe).multiplyScalar(uLampOn.value.x));
+    NIGHT.lamps.children.forEach((s) => { const v = stage(s.userData.at, .14); s.material.opacity = .8 * v; s.visible = v > 0; });
+    let i = 0;
+    NIGHT.shops.forEach((day, g) => g.emissive.copy(day).lerp(DARK.shop, stage(1.35 + .045 * i++, .22)));
+    NIGHT.signs.forEach((glow, g) => g.emissive.setScalar(glow * stage(1.9, .35)));
+    const beam = stage(1.75, .45);
+    if (NIGHT.letters) NIGHT.letters.emissive.setRGB(.2 * beam, .13 * beam, .06 * beam);    // the bronze letters catch a little of it
+    if (NIGHT.cinema) {
+      NIGHT.cinema.wash.material.opacity = .46 * beam; NIGHT.cinema.wash.visible = beam > 0;
+      NIGHT.cinema.heads.forEach((h) => { h.material.opacity = .75 * beam; h.visible = beam > 0; });
+      NIGHT.cinema.lens.color.setRGB(.29 + .71 * beam, .27 + .55 * beam, .22 + .33 * beam);
+    }
+    NIGHT.rooms.mesh.material.opacity = k; NIGHT.rooms.mesh.visible = lit;
+    if (NIGHT.T !== NIGHT.painted) { NIGHT.rooms.list.forEach(paintRoom); NIGHT.painted = NIGHT.T; }
+    const t = uNightT.value, blend = k > .6 ? THREE.AdditiveBlending : THREE.NormalBlending;
+    if (fountain.material.blending !== blend) fountain.material.blending = blend;
+    NIGHT.spots.forEach((s, j) => { pal(j / 8 + t * .045, s.material.color); s.material.opacity = .85 * pool; s.visible = pool > 0; });
+    // the moon goes straight up and settles with a small bounce; the clouds do not travel, they gather where it stops
+    const place = (o, az, el, r) => o.position.set(Math.cos(el) * Math.sin(az), Math.sin(el), -Math.cos(el) * Math.cos(az)).multiplyScalar(r);
+    const low = D(-9), e = low + (NIGHT.el - low) * hop((NIGHT.T - .4) / .95);
+    place(NIGHT.disc, NIGHT.az, e, MOON_R); NIGHT.halo.position.copy(NIGHT.disc.position);
+    place(NIGHT.cloud, NIGHT.az + D(2.6) * Math.sin(t * .09), NIGHT.el - D(.9), MOON_R * .985);
+    NIGHT.disc.material.opacity = stage(.4, .25); NIGHT.halo.material.opacity = stage(.7, .8); NIGHT.cloud.material.opacity = .85 * stage(1.5, 1.4); NIGHT.stars.material.opacity = .8 * stage(.3, 1.2);
+    [NIGHT.disc, NIGHT.halo, NIGHT.cloud, NIGHT.stars].forEach((o) => { o.visible = lit; });
+  }
+  function nightStep(now) {
+    const dt = Math.min(.25, (now - NIGHT.last) / 1000 || 0); NIGHT.last = now; NIGHT.raf = 0;
+    const root = scene.getObjectByName("blender");
+    if (root && root !== NIGHT.root) lampThings(root);                  // the model was loaded again
+    NIGHT.T = reduce ? (NIGHT.on ? END : 0) : NIGHT.on ? Math.min(END, NIGHT.T + dt) : Math.max(0, NIGHT.T - dt * END / BACK);
+    if (!reduce) { uNightT.value += dt; if (NIGHT.on && NIGHT.T === END) someoneAtHome(uNightT.value, dt); }
+    if (NIGHT.place) {                                      // the moon will stop where the visitor is looking: high on the left of the view
+      NIGHT.place = false; camera.updateMatrixWorld();
+      const dir = new THREE.Vector3(-.58, .68, .5).unproject(camera).sub(camera.getWorldPosition(new THREE.Vector3())).normalize();
+      NIGHT.el = clamp(Math.asin(dir.y), D(5.8), D(30)); NIGHT.az = Math.atan2(dir.x, -dir.z);
+    }
+    nightPaint();
+    if (NIGHT.on ? !reduce : NIGHT.T > 0) NIGHT.raf = requestAnimationFrame(nightStep);
+  }
+  // called while the loading veil is still up: every shader is patched there, so the first press of the moon does not stall
+  function nightReady(root) {
+    if (!NIGHT.made) moonThings();
+    lampThings(root); nightPaint();
+    [NIGHT.disc, NIGHT.halo, NIGHT.cloud, NIGHT.stars, ...NIGHT.spots, ...NIGHT.lamps.children, ...(NIGHT.cinema ? [NIGHT.cinema.wash, ...NIGHT.cinema.heads] : [])].forEach((o) => renderer.initTexture(o.material.map));
+    renderer.initTexture(uLampMap.value); renderer.initTexture(NIGHT.rooms.mesh.material.map);
+  }
+  function setNight(on) {
+    const root = scene.getObjectByName("blender");
+    if (!root) return;
+    if (!NIGHT.made) moonThings();
+    if (root !== NIGHT.root) lampThings(root);
+    NIGHT.on = on; document.body.classList.toggle("night", on);
+    if (on && NIGHT.T < .2) NIGHT.place = true;           // chosen on the next frame, when the camera is surely up to date
+    NIGHT.last = performance.now();
+    if (!NIGHT.raf) NIGHT.raf = requestAnimationFrame(nightStep);
+  }
 requestAnimationFrame(frame);
 })();

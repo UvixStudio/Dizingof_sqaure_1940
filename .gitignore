@@ -11,8 +11,13 @@ Thumbs.db
 blender/preview/ref/
 blender/preview/*.png
 blender/preview/*_blend.jpg
+blender/preview/about/archive/
 blender/*.blend
 blender/*.blend1
 facelift/.server.log
 # קובץ השמיים (CC0, להורדה מ-polyhaven, ראה blender/sky.py)
 blender/hdri/
+# downloaded character sources (polyfork.dev), CC BY 4.0
+assets/people_polyfork/
+# local page for looking over the figures
+blender/preview/people/

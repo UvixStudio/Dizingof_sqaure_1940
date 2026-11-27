@@ -11,7 +11,7 @@ from PIL import Image
 
 GRID = {"POSITION": 1 / 1024, "NORMAL": 1 / 128, "TEXCOORD_0": 1 / 4096}
 MAX_SIDE = {"grass": 1024}                      # big noisy textures that read the same at half size
-QUALITY = {"grass": 80, "flowers": 70}          # everything else: 78
+QUALITY = {"grass": 80, "flowers": 70, "signs": 92}          # everything else: 78
 KEEP_BELOW = 20000                              # small textures (cut-outs, the people palette) stay exactly as they are
 WIDTH = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
 

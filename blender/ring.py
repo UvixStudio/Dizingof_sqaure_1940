@@ -6,7 +6,7 @@ from mathutils import Vector
 F = runpy.run_path(os.path.join(r"C:\Ai\01_kikar_dizingof", "blender", "facade.py"))
 Chain, sweep, slab, post, column, awning, solid, drop_loops = (
     F[n] for n in ("Chain", "sweep", "slab", "post", "column", "awning", "solid", "drop_loops"))
-PLASTER, GLASS, FRAME, AWNING, ROOF, SHUTTER = range(6)
+PLASTER, GLASS, FRAME, AWNING, ROOF, SHUTTER, COLUMN = range(7)
 
 BASE = {"ground": 4.0, "floor": 3.4, "floors": 2, "style": "bands", "recess": 0.9, "tint": "wall_white",
         "columns": (0.0, 1.0), "penthouse": False, "roofboxes": 2, "tower": None,
@@ -77,15 +77,18 @@ def block(outline, over):
     sweep(bm, ch, 0, L, slab(0.45, G - 0.6, back, B), GLASS)
     sweep(bm, ch, 0, L, slab(G - 0.6, G, 0.35, B), PLASTER)
     if c0 > 1:                                    # solid shop walls where there is no colonnade
-        s = 0.2
+        s = 0.6                               # piers stand between the bays, not in front of a shop
         while s < c0:
             post(bm, ch, s, 0.7, 0.5, back - 0.65, 0.0, G - 0.6, PLASTER)
             for k in (1, 2, 3):
                 post(bm, ch, s + k * 1.05, back - 0.07, 0.07, 0.12, 0.45, G - 0.6, FRAME)
             s += 4.2
-    s = c0 + 0.6
+    columns = []
+    s = 0.6 + 4.2 * math.ceil(c0 / 4.2)
     while s < c1:
-        column(bm, ch, s, 0.65, 0.27, G - 0.55, PLASTER)
+        column(bm, ch, s, 0.65, 0.27, G - 0.55, COLUMN, seg=20)
+        foot, inward = ch.at(s, 0.65)                 # lit from the square, turned a little towards the sun
+        columns.append((foot.x, foot.y, math.atan2(-inward.y, -inward.x) - 0.75, G - 0.55))
         for k in (1, 3):
             post(bm, ch, s + k * 1.05, back - 0.07, 0.07, 0.12, 0.45, G - 0.6, FRAME)
         s += 4.2
@@ -134,7 +137,7 @@ def block(outline, over):
     else:
         sweep(bm, ch, 0, t0, slab(top + 1.15, top + 1.27, -0.12, 0.32), PLASTER)
 
-    info = {"chain": ch, "G": G, "H": H, "t0": t0, "tower": corner if T else L, "top": top, "attic": P["attic"]}
+    info = {"chain": ch, "G": G, "H": H, "t0": t0, "tower": corner if T else L, "top": top, "attic": P["attic"], "recess": D, "columns": columns}
     if T:                                         # blank corner wall, flush with the attic
         th = top + P["attic"]
         sweep(bm, ch, t0, t1, slab(G, th, 0.05, B), PLASTER)

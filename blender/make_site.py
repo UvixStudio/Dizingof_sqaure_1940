@@ -13,6 +13,18 @@ for a in ("genia.jpg", "plan.jpg"):
 WEB = os.path.join(ROOT, "blender", "web")          # code that only this site has: cameras, smooth dragging, speed
 
 
+def captions():
+    """The subtitle file as [[from, to, text], ...] for web/captions.js."""
+    srt = open(os.path.join(ROOT, "data", "dizengoff_opening_he_fixed.srt"), encoding="utf-8-sig").read()
+    sec = lambda t: sum(float(x) * k for x, k in zip(t.replace(",", ".").split(":"), (3600, 60, 1)))
+    out = []
+    for block in srt.replace("\r", "").strip().split("\n\n"):
+        lines = block.split("\n")
+        start, end = (x.strip() for x in lines[1].split("-->"))
+        out.append([sec(start), sec(end), " ".join(lines[2:]).strip()])
+    return json.dumps(out, ensure_ascii=False)
+
+
 def web(n):
     return open(os.path.join(WEB, n), encoding="utf-8").read()
 
@@ -67,19 +79,22 @@ html = rep(html, '\n<script src="export.js"></script>', "")
 a = html.index("      <li>הבלוקים, הרווחים")
 b = html.index("      <li>נקודות המידע")
 html = html[:a] + """      <li>גרסת עבודה: המודל נבנה בבלנדר לפי תצלומים מ־1938-1940 ועדיין בתהליך.</li>
-      <li>צורות הבניינים וכיווני הרחובות מ־OpenStreetMap, © תורמי OpenStreetMap. טרם אומת אילו מהבניינים עמדו ב־1940.</li>
+      <li>צורות הבניינים וכיווני הרחובות מ־OpenStreetMap, © תורמי OpenStreetMap. הדגם כולל גם מבנים שהושלמו אחרי 1940, כמו מלון גזית (1948).</li>
       <li>קולנוע אסתר הותאם לתצלומים. החזיתות של שאר הבניינים, הצבעים והרכבים הם פרשנות.</li>
       <li>טבעות הגן, הכביש והמזרקה נמדדו מתצלומים, בדיוק משוער.</li>
-      <li>חלק משמות העסקים לקוחים מתצלומים ומוויקיפדיה, השאר כלליים. מיקום החנויות, צבעי הסככות והכרזה הגדולה הם שחזור.</li>
+      <li>שמות הבתים, שנותיהם והאדריכלים לפי ויקיפדיה. השיוך של בתי פלדמן, גרינמן ומירנברג לגוש מסוים בטבעת הוא השערה.</li>
+      <li>שמות אקמן, קפה אמנות, בית מרקחת וגל-אור לקוחים מתצלומים ומוויקיפדיה. שלמן, ויטמן, פיינשטוק והספר הטוב היו עסקים בתל אביב, לא בהכרח בכיכר. שאר שמות החנויות הומצאו ברוח התקופה. חזיתות החנויות, מיקומן, צבעי הסככות והכרזה הגדולה הם שחזור.</li>
 """ + html[b:]
-ICON = ('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">'
-        '<path d="M4 8h3l1.6-2.5h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.2" r="3.4"/></svg>')
-html, n = re.subn(r'<div class="seg" role="group".*?</div>',
-                  lambda m: '<label class="cam-pick" title="בחירת מצלמה">%s<select id="cam-select" aria-label="בחירת מצלמה"></select></label>' % ICON,
-                  html, flags=re.S)
-assert n == 1, "camera buttons not found"
+html, n = re.subn(r'<section class="bar".*?</section>', lambda m: web("bar.html").strip(), html, flags=re.S)
+assert n == 1, "control bar not found"
 html = rep(html, 'href="style.css"', 'href="style.css?v=%d"' % int(time.time()))
-html = rep(html, '<button class="pill" data-spot="genia">', '<button class="pill" data-spot="opening">חנוכת הכיכר 1938</button>\n      <button class="pill" data-spot="genia">')
+# "about" moved into the round button of web/bar.html
+html, n = re.subn(r'\s*<button class="pill" id="info-btn".*?</button>', "", html, count=1)
+assert n == 1, "info button not found"
+html = rep(html, "family=Assistant:wght@400;600;700", "family=Assistant:wght@400;600;700&family=Heebo:wght@400;500;700&family=Secular+One")
+html = rep(html, "family=Frank+Ruhl+Libre:wght@500;700", "family=Frank+Ruhl+Libre:wght@500;700;900")
+FA = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/"      # solid LinkedIn / WhatsApp marks in "about"
+html = rep(html, "</head>", '<link rel="stylesheet" href="%sfontawesome.min.css">\n<link rel="stylesheet" href="%sbrands.min.css">\n</head>' % (FA, FA))
 html = rep(html, '<div dir="rtl">', '''<div dir="rtl">
   <div class="loading" id="loading" role="status">
     <div class="plate">כיכר צינה דיזנגוף<small>שחזור תלת־ממד 1940</small></div>
@@ -96,16 +111,80 @@ open(os.path.join(OUT, "index.html"), "w", encoding="utf-8").write(html)
 js = read("scene.js")
 # cameras and input (replaces the four view buttons, the pointer code and the phone sensor code)
 js = between(js, "// ---------- viewpoints and camera ----------", '$("info-btn")', web("controls.js"))
+# street names: the serif, heavier. The plates are drawn on a canvas, so the weight (Hebrew and Latin) is asked for first
+js = rep(js, 'x.font = "700 150px " + SERIF; x.fillText(name, 384, 140);', 'x.font = "900 152px " + SERIF; x.fillText(name, 384, 140);')
+js = rep(js, 'x.font = "600 76px " + SERIF; x.fillText(en, 384, 292);', 'x.font = "900 74px " + SERIF; x.fillText(en, 384, 292);')
+js = rep(js, "document.fonts.load('700 100px \"Frank Ruhl Libre\"').then(go)",
+         "Promise.all([700, 900].map((w) => document.fonts.load(w + ' 100px \"Frank Ruhl Libre\"', 'אבA'))).then(go)")
+# every point of interest: one small solid pin badge, no outline and no pulsing ring
+js = between(js, "const markerTex = (icon)", "const ringTex", """const markerTex = () => canvasIcon((x) => {
+    x.fillStyle = "#4a3425"; x.beginPath(); x.arc(64, 64, 62, 0, 7); x.fill();
+    x.fillStyle = "#f4ead0"; x.beginPath(); x.moveTo(64, 108); x.bezierCurveTo(46, 89, 35, 71, 35, 52); x.arc(64, 52, 29, Math.PI, 0); x.bezierCurveTo(93, 71, 82, 89, 64, 108); x.fill();
+    x.fillStyle = "#4a3425"; x.beginPath(); x.arc(64, 52, 11, 0, 7); x.fill();
+  });
+  """)
+js = rep(js, "s = clamp(d * .05, 1.8, 9)", "s = clamp(d * .036, .45, 6)")          # the same small size near or far
+js = rep(js, "h.sp.scale.set(s, s, 1);", "h.sp.scale.set(s, s, 1); h.ring.visible = false; h.sp.visible = !(h.aside && d < 5);")
+# the close button carries a drawn cross, not a text character
+js = rep(js, 'aria-label="סגירה">✕</button>', 'aria-label="סגירה"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>')
+js = between(js, '$("info-btn").addEventListener', "  // ---------- hotspots", '$("info-btn").addEventListener("click", () => openAbout());\n\n')
+# the bar has no handle any more: it only steps aside for a card
+js = between(js, 'const barEl = document.querySelector(".bar")', "function closeCard()",
+             'const barEl = document.querySelector(".bar");\n  const setBar = (min) => { barEl.classList.toggle("min", min); closeMenus(); };\n  ')
+js = rep(js, "() => flyTo(hotspots.find((h) => h.key === b.dataset.spot))",
+         "() => { const h = hotspots.find((x) => x.key === b.dataset.spot); if (h) flyTo(h); }")
+X = 'aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;'
+js = rep(js, X, X[:-2] + '<div class="scroll">`;')
+js = rep(js, "card.innerHTML = html; card.scrollTop = 0;", 'card.innerHTML = html + "</div>";')
+# a card may carry its own extra block (the cinema: posters and a film list)
+js = rep(js, "c.body.forEach((t) => { html += `<p>${esc(t)}</p>`; });", "c.body.forEach((t) => { html += `<p>${esc(t)}</p>`; });\n    html += c.extra || \"\";")
+# the dots under the signs: solid, half see-through blue discs (web/ground.js makes them blink like radar points)
+js = between(js, "const padTex = (() => {", "function addSign", """const padTex = (() => { const c = document.createElement("canvas"); c.width = c.height = 128; const x = c.getContext("2d");
+    x.fillStyle = "#ffffff"; x.beginPath(); x.arc(64, 64, 62, 0, 7); x.fill(); return new THREE.CanvasTexture(c); })();
+  """)
+js = rep(js, "new THREE.MeshBasicMaterial({ map: padTex, transparent: true,", "new THREE.MeshBasicMaterial({ map: padTex, color: 0xfff1d6, opacity: .95, transparent: true,")
+for a, b in (("rgba(29,42,90,.85)", "rgba(250,240,216,.95)"), ("rgba(29,42,90,.4)", "rgba(250,240,216,.6)"), ("rgba(29,42,90,0)", "rgba(250,240,216,.3)")):
+    js = rep(js, a, b)
+js = rep(js, "new THREE.PlaneGeometry(.1, SIGN_Y - SIGN_H / 2)", "new THREE.PlaneGeometry(.045, SIGN_Y - SIGN_H / 2)")
+js = rep(js, "new THREE.PlaneGeometry(2.6, 2.6)", "new THREE.PlaneGeometry(.62, .62)")
+# building names float over their building: no line, no dot
+js = rep(js, "sg.userData.stem.rotation.y = sg.rotation.y;", "if (sg.userData.stem) sg.userData.stem.rotation.y = sg.rotation.y;")
+# a tap that hits no point of interest walks there (web/walk.js); a walk ends without opening a card
+js = rep(js, "if (best) flyTo(best);", "if (best) flyTo(best); else walkTo(x, y);")
+js = rep(js, "if (u >= 1) { const h = flight.h; flight = null; openCard(h); }",
+         "if (flight.arc) rig.position.y += flight.arc * Math.sin(Math.PI * e);\n      if (u >= 1) { const h = flight.h; flight = null; if (h) openCard(h); }")
+# the site opens (and the title returns) on the roof, like the archive photographs
+js = rep(js, 'gyroOff(); setView("in"); };', 'gyroOff(); setView("roof"); };')
+js = rep(js, 'grain(); resize(); setView("in");', 'grain(); resize(); setView("roof");')
 js = rep(js, 'cam.mode = "fp"; rig.rotation.set(0, 0, 0); look.yaw = from.yaw;', 'stopMotion(); cam.mode = "fp"; rig.rotation.set(0, 0, 0); look.yaw = from.yaw;')
 js = rep(js, 'if (cam.mode === "orbit") applyOrbit(); else if (gyro.on && gyro.e) applyGyro(); else camera.rotation.set(look.pitch, look.yaw, 0);',
          'updateCamera(dt);')
 # frame pacing: cars move inside the same frame that draws them, and slow devices draw fewer pixels
 js = rep(js, "const dt = Math.min(.05, (now - last) / 1000); last = now;",
-         "const ms = now - last, dt = clamp(ms / 1000, 0, .1); last = now; adapt(ms, now); moveTraffic(now, dt);")
+         "const ms = now - last, dt = clamp(ms / 1000, 0, .1); last = now; adapt(ms, now); moveTraffic(now, dt); clearView();")
 js = rep(js, "// ---------- renderer ----------", web("perf.js") + "// ---------- renderer ----------")
-js = rep(js, "new THREE.WebGLRenderer({ canvas, antialias: true });", "new THREE.WebGLRenderer({ canvas, antialias: !weak });")
+js = rep(js, "new THREE.WebGLRenderer({ canvas, antialias: true });", "new THREE.WebGLRenderer({ canvas, antialias: smoothing });")
 js = rep(js, "renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));",
          'renderer.setPixelRatio(ratio);\n  THREE.ShaderChunk.fog_fragment += "\\n' + GRADE + '";   // colour grade, once per pixel inside the shaders')
+# Genia sits on her own bench in the model (island.py, bearing 34): the camera comes close and leaves her left of the card
+js = between(js, "  { // Genia on the south bench", "  { // a film camera", """  const GENIA_AT = P(25.25, D(34), 0);
+  addHotspot("genia", "person", P(25.1, D(34), 2.12), P(23.45, D(29.1), 1.62), P(25.05, D(34), 0.94));   // from her side, a little above
+  hotspots[hotspots.length - 1].aside = true;
+  function clearView() {                                  // nobody strolls between her and whoever is reading about her
+    const close = rig.position.distanceTo(GENIA_AT) < 4.6;
+    movers.forEach((m) => { m.o.visible = m.o.name === "idle_genia" || !close || m.o.position.distanceTo(GENIA_AT) > 4.4; });
+  }
+""")
+js = rep(js, "to: { pos: h.cam.pos, yaw: from.yaw + dy, pitch: h.cam.pitch, fov: 58 }",
+         "to: { pos: h.cam.pos, yaw: from.yaw + dy - asideYaw(h), pitch: h.cam.pitch, fov: 58 }")
+js = rep(js, "  function flyTo(h) {", """  function asideYaw(h) {                                 // on a wide screen the card covers the right side
+    if (!h.aside || innerWidth < 800 || innerHeight < 560) return 0;
+    const covered = (Math.min(576, innerWidth * .46) + 22) / innerWidth;
+    return Math.atan(covered * Math.tan(29 * Math.PI / 180) * innerWidth / innerHeight);
+  }
+  function flyTo(h) {""")
+# the dedication film plays with our Hebrew captions (web/captions.js)
+js = rep(js, 'if (v) v.addEventListener("click", () => { ', 'if (v) v.addEventListener("click", () => { if (c.captions) { playWithCaptions(v, c); return; } ')
 # video cards: each names its own film, and an old 4:3 film gets a 4:3 frame
 js = rep(js, 'aria-label="נגן את הפתיח" style="background-image:url(https://img.youtube.com/vi/${c.video}/hqdefault.jpg)',
          'aria-label="נגן את הסרטון" style="aspect-ratio:${c.ratio || \'16 / 9\'};background-image:url(https://img.youtube.com/vi/${c.video}/hqdefault.jpg)')
@@ -116,7 +195,7 @@ js = rep(js, "  const signs = [];\n", """  [["דיזנגוף", "DIZENGOFF", 348]
     .forEach(([name, en, deg], k) => Object.assign(ARMS[k], { name, en, t: D(deg) }));
   const signs = [];
 """)
-js = rep(js, "    signs.push(s);\n", "    dotM.userData.keep = true;\n    signs.push(s);\n")
+js = rep(js, "    signs.push(s);\n", "    dotM.userData.keep = true; dotM.userData.pad = true;\n    signs.push(s);\n")
 js = rep(js, "g.add(gl);\n", "g.add(gl); scene.attach(gl); gl.userData.keep = true;\n")
 i = js.rindex("requestAnimationFrame(frame);")
 js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry with the Blender model ----------
@@ -183,7 +262,7 @@ js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry 
         if (!o.isMesh) return;
         o.castShadow = o.receiveShadow = true;
         const m = o.material;
-        if (m.alphaTest > 0) o.castShadow = false;            // every mesh that uses a cut-out, not only the first
+        if (m.alphaTest > 0 || m.transparent) o.castShadow = false;            // every mesh that uses a cut-out, not only the first
         if (done.has(m)) return;
         done.add(m);
         if (m.alphaTest > 0) m.side = THREE.DoubleSide;
@@ -195,14 +274,19 @@ js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry 
       });
       scene.add(g.scene);
       collect(g.scene);
+      obstacles(g.scene);
+      signposts(g.scene);
       merge(g.scene);
       shadows(g.scene);
+      paint(g.scene);
+      nightReady(g.scene);
+      walkingFigures(t);
       reveal();
     }, loadFailed);
   }
   // ---------- building labels (cream plates, so they are not mistaken for street names) + Esther card ----------
-  const LABELS = { B: ["קולנוע כיכר דיזנגוף", "לימים קולנוע אסתר"], D: ["בתי פלדמן וגרינמן", "1935-36 · המיקום לאימות"],
-                   F: ["בית מירנברג", "1936 · ג'ניה אוורבוך · המיקום לאימות"] };
+  const LABELS = { B: ["קולנוע כיכר דיזנגוף", "לימים קולנוע אסתר"], D: ["בתי פלדמן וגרינמן", "לילנפלד וביז'ונסקי · 1935-36"],
+                   F: ["בית מירנברג", "תכנון: ג'ניה אוורבוך · 1936"] };
   const labelTex = (name, sub) => canvasTex(896, 320, (x) => {
     rr(x, 6, 6, 884, 308, 34); x.fillStyle = "rgba(244,234,208,.93)"; x.fill();
     x.strokeStyle = "#9a7b3f"; x.lineWidth = 7; rr(x, 22, 22, 852, 276, 24); x.stroke();
@@ -224,23 +308,16 @@ js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry 
     let list = [];
     try { list = await (await fetch("labels.json?t=" + Date.now(), { cache: "no-store" })).json(); } catch (e) { return; }
     list.forEach((b) => {
-      const y = b.top + 4.2, W = 6.4, H = 2.29, x = b.x, z = -b.y;
-      const s = new THREE.Group(); s.position.set(x, y, z); scene.add(s);
+      const y = b.top + 3.6, W = 6.4, H = 2.29, x = b.x, z = -b.y;
+      const s = new THREE.Group(); s.position.set(x - b.nx * 6, y, z + b.ny * 6); scene.add(s); s.userData.keep = true;   // over the middle of the block
       const m = new THREE.MeshBasicMaterial({ map: labelTex(...LABELS[b.key]), transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false });
       s.userData.m = m; s.add(new THREE.Mesh(new THREE.PlaneGeometry(W, H), m));
-      const h = y - H / 2, stem = new THREE.Mesh(new THREE.PlaneGeometry(.1, h), new THREE.MeshBasicMaterial({ map: fadeTex, color: 0xffd98a, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
-      stem.position.set(x, h / 2, z); scene.add(stem); s.userData.stem = stem; signs.push(s);
-      const dot = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 2.2).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: padTex, color: 0xffd98a, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
-      dot.position.set(x, .13, z); scene.add(dot);
+      signs.push(s);
       if (b.key === "B") {
         const out = new THREE.Vector3(b.nx, 0, -b.ny), at = new THREE.Vector3(x, 5.6, z).addScaledVector(out, 1.4);
-        addHotspot("esther", "person", at, new THREE.Vector3(x, 1.7, z).addScaledVector(out, 26), new THREE.Vector3(x, 7.5, z));
-        const hs = hotspots[hotspots.length - 1];
-        hs.sp.material.map = canvasTex(128, 128, (c) => {
-          c.fillStyle = "rgba(236,223,192,.96)"; c.beginPath(); c.arc(64, 64, 60, 0, 7); c.fill();
-          c.fillStyle = "#4a3425"; c.beginPath(); c.arc(64, 64, 51, 0, 7); c.fill();
-          c.fillStyle = "#f0e3c2"; c.font = "700 76px " + SERIF; c.fillText("i", 64, 68);
-        });
+        const tower = new THREE.Vector3(49.5, 0, -4.9);                  // the wall with the name sign and the poster
+        addHotspot("esther", "person", at, tower.clone().addScaledVector(out, 25).setY(9), tower.clone().setY(10.2));
+        hotspots[hotspots.length - 1].aside = true;
       }
     });
   })();
@@ -259,7 +336,7 @@ js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry 
       else if (n.startsWith("pram_")) w = 0.75 / 18.9;
       else if (n.startsWith("kidbike_")) w = 2.3 / 20.3;
       else if (n.startsWith("cycle_")) w = 3.6 / 36.7;
-      if (!w) return;
+      if (!w && !n.startsWith("idle_")) return;
       const nose = new THREE.Vector3(1, 0, 0).applyQuaternion(o.quaternion);          // Blender forward is +X
       const sign = Math.sign(nose.x * p.z - nose.z * p.x) || 1;                        // drive nose first
       movers.push({ o, w: w * sign, y: p.y, bob, ph: Math.random() * 6 });
@@ -310,7 +387,7 @@ js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry 
       root.add(one);
     });
   }
-  camera.near = .4; camera.updateProjectionMatrix();
+  camera.near = Number((location.search.match(/[?&]near=([0-9.]+)/) || [])[1]) || .4; camera.updateProjectionMatrix();   // ?near=3 : more depth precision, to compare
   window.__kikar.renderer = renderer; window.__kikar.camera = camera;      // for checking the load from the console
   function moveTraffic(now, dt) {
     if (reduce && cam.mode !== "ride") return;            // a ride was asked for, so it drives even with reduced motion
@@ -318,6 +395,8 @@ js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry 
       m.o.position.applyAxisAngle(UP, m.w * dt);
       m.o.quaternion.premultiply(turn.setFromAxisAngle(UP, m.w * dt));
       if (m.bob) m.o.position.y = m.y + Math.abs(Math.sin(now / 160 + m.ph)) * .035;
+      if (m.poses) stepWalker(m, dt);
+      if (m.idle) stepIdle(m, dt);
     });
     placeShadows();
   }
@@ -337,7 +416,7 @@ js = js[:i] + web("load.js") + """// ---------- replace the procedural geometry 
     } catch (e) { /* nothing published yet */ }
     setTimeout(poll, 4000);
   })();
-  """.replace("__GRADE__", GRADE) + web("shadows.js") + web("opening.js") + js[i:]
+  """.replace("__GRADE__", GRADE) + web("shadows.js") + web("people_walk.js") + web("paint.js") + web("walk.js") + web("ground.js") + web("signposts.js") + web("opening.js") + web("zina.js") + web("levels.js") + web("genia.js") + web("captions.js").replace("__CAPTIONS__", captions()) + web("cinema.js") + web("about.js") + web("share.js") + web("night.js") + js[i:]
 # sky: panorama made from the same HDRI as in Blender (sky.py writes sky.jpg and sky.json)
 haze = json.load(open(os.path.join(OUT, "sky.json")))["haze"]
 js = rep(js, "const HAZE = 0xe6e2d3;", "const HAZE = %s;" % haze)

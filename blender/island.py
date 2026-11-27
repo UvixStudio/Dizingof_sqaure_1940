@@ -367,11 +367,18 @@ def build_island():
         for s in (-1, 0, 1):
             tb = t + s * deg(2.7, GRAVEL + 0.95)
             instance("bench", bench, polar(GRAVEL + 0.95, tb, 0.115), math.pi - math.radians(tb), cp)
+            seated = None
             if MID.random() < 0.45:
                 a = math.radians(tb)
                 along = Vector((math.cos(a), -math.sin(a), 0))
-                instance("sitter", MID.choice(SITTERS), polar(GRAVEL + 0.95, tb, 0.115) + along * MID.choice((-0.55, 0.15, 0.6)),
-                         math.atan2(-math.cos(a), -math.sin(a)), cp)
+                seated = (MID.choice(SITTERS), polar(GRAVEL + 0.95, tb, 0.115) + along * MID.choice((-0.55, 0.15, 0.6)),
+                          math.atan2(-math.cos(a), -math.sin(a)))
+            if k == 0 and s == 0:                    # Genia's bench (bearing 34)
+                a = math.radians(tb)
+                instance("genia", GENIA, polar(GRAVEL + 0.95, tb, 0.115), math.atan2(-math.cos(a), -math.sin(a)), cp)
+                print("genia bearing", round(tb, 2), "radius", GRAVEL + 0.95)
+            elif seated:
+                instance("sitter", *seated, cp)
 
     # ---- flower beds, saplings in tripods, young palms ----
     for k in range(4):

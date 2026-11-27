@@ -81,8 +81,9 @@ def tex_mat(name, file, tile, rough=0.9):
     return m
 
 
-def flat_mat(name, color, rough=0.8, emit=0.0, two_sided=False):
+def flat_mat(name, color, rough=0.8, emit=0.0, two_sided=False, metal=0.0):
     m, b = _bsdf(name)
+    b.inputs["Metallic"].default_value = metal
     b.inputs["Base Color"].default_value = (*color, 1)
     b.inputs["Roughness"].default_value = rough
     if emit:
@@ -234,6 +235,48 @@ def alpha_mat(name, file):
     return m
 
 
+def soft_mat(name, file):
+    """A see-through picture with soft edges (a painted shadow)."""
+    m = tex_mat(name, file, 1.0, 1.0)
+    nt = m.node_tree
+    tex = next(n for n in nt.nodes if n.type == "TEX_IMAGE")
+    tex.extension = "CLIP"
+    nt.links.new(tex.outputs["Alpha"], nt.nodes["Principled BSDF"].inputs["Alpha"])
+    m.surface_render_method = "BLENDED"
+    return m
+
+
+def dress_columns(key, me, columns, shadow, c):
+    """The colonnade's painted shading: u turns round the column from its lit side, v runs from floor to ceiling.
+    Each column also gets a soft round shadow on the paving. columns = [(x, y, lit angle, height)]."""
+    if not columns:
+        return
+    uv = me.uv_layers[0].data
+    for p in me.polygons:
+        if me.materials[p.material_index].name != "column":
+            continue
+        x, y, lit, high = min(columns, key=lambda k: (k[0] - p.center.x) ** 2 + (k[1] - p.center.y) ** 2)
+        turns = []
+        for li in p.loop_indices:
+            v = me.vertices[me.loops[li].vertex_index].co
+            turns.append((((math.atan2(v.y - y, v.x - x) - lit) / math.tau + 0.5) % 1.0, v.z / high))
+        if max(t for t, _ in turns) - min(t for t, _ in turns) > 0.5:          # the face across the seam
+            turns = [(t + 1.0 if t < 0.5 else t, z) for t, z in turns]
+        for li, at in zip(p.loop_indices, turns):
+            uv[li].uv = at
+    bm = bmesh.new()
+    layer = bm.loops.layers.uv.new("UVMap")
+    for x, y, _, _ in columns:
+        f = bm.faces.new([bm.verts.new((x + dx * 0.575, y + dy * 0.575, 0.035)) for dx, dy in ((-1, -1), (1, -1), (1, 1), (-1, 1))])
+        for loop, at in zip(f.loops, ((0, 0), (1, 0), (1, 1), (0, 1))):
+            loop[layer].uv = at
+    flat = bpy.data.meshes.new(key + "_column_shadows")
+    bm.to_mesh(flat)
+    bm.free()
+    flat.materials.append(shadow)
+    c.objects.link(bpy.data.objects.new(key + "_column_shadows", flat))
+
+
 def lettering(name, text, loc, outward, size, mat, c):
     """Flat sign letters standing on a facade, facing `outward` (x, y)."""
     cu = bpy.data.curves.new(name, "FONT")
@@ -297,15 +340,16 @@ def build(ficus="mature"):      # "young" = caged saplings of 1938-40, "mature" 
         "iron": flat_mat("iron", (0.05, 0.05, 0.05), 0.5),
         "wire": flat_mat("wire", (0.08, 0.08, 0.08), 0.5, two_sided=True),
         "globe": flat_mat("globe", (0.93, 0.92, 0.86), 0.3),
-        "car_black": flat_mat("car_black", (0.012, 0.012, 0.014), 0.25),
-        "car_green": flat_mat("car_green", (0.035, 0.07, 0.05), 0.35),
-        "car_grey": flat_mat("car_grey", (0.42, 0.40, 0.33), 0.4),
-        "car_maroon": flat_mat("car_maroon", (0.12, 0.018, 0.016), 0.3),
-        "car_navy": flat_mat("car_navy", (0.016, 0.035, 0.09), 0.3),
-        "car_cream": flat_mat("car_cream", (0.66, 0.57, 0.38), 0.35),
-        "bus_blue": flat_mat("bus_blue", (0.16, 0.25, 0.30), 0.4),
+        "car_black": flat_mat("car_black", (0.012, 0.012, 0.014), 0.3, metal=0.55),
+        "car_green": flat_mat("car_green", (0.035, 0.07, 0.05), 0.3, metal=0.55),
+        "car_grey": flat_mat("car_grey", (0.42, 0.40, 0.33), 0.3, metal=0.55),
+        "car_maroon": flat_mat("car_maroon", (0.12, 0.018, 0.016), 0.3, metal=0.55),
+        "car_navy": flat_mat("car_navy", (0.016, 0.035, 0.09), 0.3, metal=0.55),
+        "car_cream": flat_mat("car_cream", (0.66, 0.57, 0.38), 0.3, metal=0.55),
+        "bus_blue": flat_mat("bus_blue", (0.16, 0.25, 0.30), 0.3, metal=0.55),
         "sign_dark": flat_mat("sign_dark", (0.03, 0.03, 0.035), 0.6, two_sided=True),
-        "car_light": flat_mat("car_light", (0.65, 0.63, 0.56), 0.35),
+        "car_light": flat_mat("car_light", (0.65, 0.63, 0.56), 0.28, metal=0.7),
+        "car_red": flat_mat("car_red", (0.35, 0.015, 0.01), 0.3),
         "horse": flat_mat("horse", (0.09, 0.045, 0.02), 0.9),
         "tyre": flat_mat("tyre", (0.01, 0.01, 0.01), 0.8),
         "wood": flat_mat("wood", (0.16, 0.10, 0.05), 0.85),
@@ -320,6 +364,10 @@ def build(ficus="mature"):      # "young" = caged saplings of 1938-40, "mature" 
         "people": tex_mat("people", "people.png", 1.0, 0.85),
         "signs": tex_mat("signs", "signs.jpg", 1.0, 0.7),
         "poster": tex_mat("poster", "poster_snow.jpg", 1.0, 0.6),
+        "poster_four": tex_mat("poster_four", "poster_four.jpg", 1.0, 0.8),          # make_cinema_sign.py
+        "cine_sign": alpha_mat("cine_sign", "cinema_sign.png"),
+        "cine_shadow": soft_mat("cine_shadow", "cinema_shadow.png"),
+        "bronze": flat_mat("cine_bronze", (0.045, 0.021, 0.011), 0.75, two_sided=True),
         "aw_white": flat_mat("aw_white", (0.74, 0.71, 0.62), 0.9, two_sided=True),
         "aw_cream": flat_mat("aw_cream", (0.72, 0.55, 0.28), 0.9, two_sided=True),
         "aw_green": flat_mat("aw_green", (0.10, 0.25, 0.17), 0.9, two_sided=True),
@@ -340,7 +388,22 @@ def build(ficus="mature"):      # "young" = caged saplings of 1938-40, "mature" 
         "frame": flat_mat("frame_dark", (0.03, 0.028, 0.025), 0.6),
         "awning": flat_mat("awning", (0.74, 0.72, 0.65), 0.9, two_sided=True),
         "tin": flat_mat("roof_tin", (0.22, 0.24, 0.25), 0.55),
+        "column": tex_mat("column", "column.png", 1.0, 0.9),                 # painted light and shade (make_columns.py)
+        "column_shadow": soft_mat("column_shadow", "column_shadow.png"),
     }
+    for name in sorted(os.listdir(os.path.join(TEX, "shops"))):          # drawn shopfronts, a little self-lit for the shade
+        key = "shop_" + name[:-4]
+        M[key] = tex_mat(key, os.path.join("shops", name), 1.0, 1.0)
+        M[key].node_tree.nodes["Principled BSDF"].inputs["Specular IOR Level"].default_value = 0.0
+        pic = next(n for n in M[key].node_tree.nodes if n.type == "TEX_IMAGE")
+        pic.image.name, pic.extension = key, "EXTEND"
+        bsdf = M[key].node_tree.nodes["Principled BSDF"]
+        lit = M[key].node_tree.nodes.new("ShaderNodeTexImage")            # what glows: the shop, not its plaster
+        lit.image = bpy.data.images.load(os.path.join(TEX, "shops_glow", name), check_existing=True)
+        lit.image.reload()
+        lit.image.name, lit.extension = key + "_glow", "EXTEND"
+        M[key].node_tree.links.new(lit.outputs["Color"], bsdf.inputs["Emission Color"])
+        bsdf.inputs["Emission Strength"].default_value = 0.3
     water = flat_mat("RO_water", (0.11, 0.20, 0.21), 0.06)
     jet_m = flat_mat("RO_jet", (0.92, 0.95, 0.98), 0.25, emit=0.25)
     jet_m.node_tree.nodes["Principled BSDF"].inputs["Alpha"].default_value = 0.42
@@ -359,13 +422,19 @@ def build(ficus="mature"):      # "young" = caged saplings of 1938-40, "mature" 
     # ground: each layer its own height (no z-fighting)
     annulus("sidewalk", ROAD[1], 1500, 0.0, M["paving"], cg, 96)
     annulus("ring_road", ROAD[0], ROAD[1], 0.02, M["asphalt"], cg)
-    ring_wall("road_curb", ROAD[1], ROAD[1] + 0.3, 0.0, 0.15, M["concrete"], cg)
+    bm = bmesh.new()                              # the outer curb, open where the six streets come in
+    mouth = math.degrees(math.asin(STREET_W / 2 / ROAD[1]))
+    brgs = sorted(STREETS.values())
+    for k, a in enumerate(brgs):
+        b = brgs[(k + 1) % len(brgs)] + (360 if k + 1 == len(brgs) else 0)
+        arc_box(bm, ROAD[1], ROAD[1] + 0.3, 0.0, 0.15, a + mouth, b - mouth, max(2, int((b - a) / 2.5)))
+    finish("road_curb", bm, [M["concrete"]], cg)
     for nm, brg in STREETS.items():
-        strip("street_" + nm, brg, ROAD[1], CITY_R + 40, STREET_W, 0.021, M["asphalt"], cg)
+        strip("street_" + nm, brg, ROAD[1] - 0.35, CITY_R + 40, STREET_W, 0.018, M["asphalt"], cg)   # tucked under the ring road
 
     # island (blender/island.py shares this script's helpers)
     people = runpy.run_path(os.path.join(ROOT, "blender", "people.py"), init_globals=dict(globals()))
-    scope = dict(globals(), FICUS=ficus, SITTERS=people["sitters"](M), M=M, ci=ci, cp=cp, water=water, jet_m=jet_m)
+    scope = dict(globals(), FICUS=ficus, SITTERS=people["sitters"](M), GENIA=people["genia"](M), M=M, ci=ci, cp=cp, water=water, jet_m=jet_m)
     runpy.run_path(os.path.join(ROOT, "blender", "island.py"), init_globals=scope)
 
     # vehicles on the ring road, counter-clockwise (placeholders, 1930s silhouettes)
@@ -380,8 +449,11 @@ def build(ficus="mature"):      # "young" = caged saplings of 1938-40, "mature" 
             bm = veh["make"](kind)
             bm.to_mesh(me)
             bm.free()
-            for m in (colours[colour], M["glass"], M["tyre"], M["car_light"], M["wood"]):
+            for m in (colours[colour], M["glass"], M["tyre"], M["car_light"], M["wood"], M["car_red"]):
                 me.materials.append(m)
+            for p in me.polygons:
+                p.use_smooth = True
+            me.set_sharp_from_angle(angle=math.radians(50))
             box_uv(me)
             cache[(kind, colour)] = me
         o = instance("car_" + kind, cache[(kind, colour)], loc, rot, cp)
@@ -419,6 +491,7 @@ def build(ficus="mature"):      # "young" = caged saplings of 1938-40, "mature" 
     shops = runpy.run_path(os.path.join(ROOT, "blender", "shops.py"), init_globals=dict(globals()))
     M["signs"].use_backface_culling = False
     labels = []
+    footprints = []                                  # the street lamps stay clear of these
     n = 0
     for e in data["elements"]:
         t = e.get("tags", {})
@@ -430,6 +503,7 @@ def build(ficus="mature"):      # "young" = caged saplings of 1938-40, "mature" 
         dmin = min(math.hypot(x, y) for x, y in pts)
         if dmin < 38 or dmin > CITY_R:
             continue
+        footprints.append(pts)
         try:
             lv = int(float(t.get("building:levels", DEFAULT_LEVELS)))
         except ValueError:
@@ -438,31 +512,34 @@ def build(ficus="mature"):      # "young" = caged saplings of 1938-40, "mature" 
             key, params = ring["BLOCKS"][e["id"]]
             bm, info = ring["block"](pts, params)
             wall = M[params.get("tint", "wall_white")]
-            finish(key + "_block", bm, [wall, M["glass"], M["frame"], M["awning"], M["tin"], M["shutter"]], cb)
+            block_o = finish(key + "_block", bm, [wall, M["glass"], M["frame"], M["awning"], M["tin"], M["shutter"], M["column"]], cb)
+            dress_columns(key, block_o.data, info["columns"], M["column_shadow"], cb)
             shops["dress"](key, info, M, cb)
             if key in ("B", "D", "F"):                 # where the site hangs a building label
                 p, normal = info["chain"].at(info["chain"].length * 0.5, -0.8)
                 labels.append({"key": key, "x": round(p.x, 2), "y": round(p.y, 2),
                                "top": round(info["top"] + info["attic"], 2),
                                "nx": round(-normal.x, 3), "ny": round(-normal.y, 3)})
-            if "name" in info:                         # Esther cinema lettering (1940 postcard)
-                x, y, z, nx, ny = info["name"]
-                for k, word in enumerate(("קולנוע", "כיכר", "דיזנגוף")):
-                    lettering("sign_name_%d" % k, word[::-1], (x, y, z - 0.85 * k), (nx, ny), 0.85, M["red"], cb)
+            if "shop" in info:
                 x, y, z, nx, ny = info["shop"]
                 lettering("sign_dreamland", "DREAMLAND", (x, y, z - 0.25), (nx, ny), 0.7, M["iron"], cb)
             n += 1
         elif building("osm_%d" % e["id"], pts, max(2, min(MAX_LEVELS_1940, lv)), M, cb):
             n += 1
 
-    for k, bearing in enumerate((57, 240)):
+    for k, bearing in enumerate((159.5, 288)):      # on open corners of pavement, never in front of a shop
         shops["ad_column"]("ad_column_%d" % k, polar(45.7, bearing).to_2d(), M, cp)
+    lamps = runpy.run_path(os.path.join(ROOT, "blender", "lamps.py"), init_globals=dict(globals()))
+    lamps["street_lamps"](next(o for o in cp.objects if o.name.startswith("lamp")).data, footprints, cp)   # the garden's lamp
     site = os.path.join(ROOT, "blender", "preview", "site")
     os.makedirs(site, exist_ok=True)
     with open(os.path.join(site, "labels.json"), "w", encoding="utf-8") as f:
         json.dump(labels, f)
 
     people["populate"](M, cp)
+    if os.path.isdir(os.path.join(ROOT, "assets", "people_polyfork", "clean")):      # downloaded sources, not in git
+        pf = runpy.run_path(os.path.join(ROOT, "blender", "people_polyfork.py"), init_globals=dict(globals()))
+        print("figures swapped", pf["dress"](pf["figures"](M, people), root))
 
     # sun + sky: HDRI daylight (sky.py), sun lamp placed where the HDRI sun is
     sk = runpy.run_path(os.path.join(ROOT, "blender", "sky.py"))

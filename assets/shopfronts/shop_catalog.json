@@ -1,0 +1,351 @@
+[
+  {
+    "number": "S01",
+    "id": "deli",
+    "filename": "S01_deli.png",
+    "name": "Delicatessen",
+    "frame": "iron",
+    "contents": "Cheeses, cured meats, pickle barrels, marble counter, butcher slicing meat",
+    "model_bays": [
+      "A1",
+      "E3",
+      "E9"
+    ],
+    "layout": "Approved master; do not regenerate",
+    "json_candidates": [
+      "deli.json"
+    ],
+    "status": "approved_master"
+  },
+  {
+    "number": "S02",
+    "id": "shoes",
+    "filename": "S02_shoes.png",
+    "name": "Shoe shop",
+    "frame": "dark_wood",
+    "contents": "Men’s and women’s shoes, tiered displays, boxes, stools, cobbler",
+    "model_bays": [
+      "A3",
+      "C4",
+      "E5",
+      "B0"
+    ],
+    "layout": "Central entry, two displays; one globe and task lamp",
+    "json_candidates": [
+      "shoes.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S03",
+    "id": "bakery",
+    "filename": "S03_bakery.png",
+    "name": "Bakery",
+    "frame": "medium_wood",
+    "contents": "Bread, challah, rolls, baskets, wooden shelves, baker in white apron",
+    "model_bays": [
+      "A4",
+      "C2",
+      "F0",
+      "D9"
+    ],
+    "layout": "Open service counter on one side, bread display on other; metal shades",
+    "json_candidates": [
+      "bakery.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S04",
+    "id": "flowers",
+    "filename": "S04_flowers.png",
+    "name": "Florist",
+    "frame": "iron",
+    "contents": "Buckets of flowers, bouquets, potted plants, florist tying bouquet",
+    "model_bays": [
+      "F5",
+      "E0",
+      "C9"
+    ],
+    "layout": "Wide asymmetrical display, side door; mainly daylight",
+    "json_candidates": [
+      "flowers.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S05",
+    "id": "textile",
+    "filename": "S05_textile.png",
+    "name": "Textile shop",
+    "frame": "dark_wood",
+    "contents": "Fabric rolls, measuring table, dressmaker mannequin, saleswoman",
+    "model_bays": [
+      "B3",
+      "E7",
+      "C3",
+      "D0"
+    ],
+    "layout": "Broad entry, fabrics at varied heights; plain shade",
+    "json_candidates": [
+      "textile.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S06",
+    "id": "watch",
+    "filename": "S06_watch.png",
+    "name": "Watchmaker",
+    "frame": "dark_wood",
+    "contents": "Wall clocks, pocket watches, glass cabinet, watchmaker with loupe",
+    "model_bays": [
+      "F3",
+      "B5",
+      "E2"
+    ],
+    "layout": "Small display, seated watchmaker; brass task lamp",
+    "json_candidates": [
+      "watch.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S07",
+    "id": "books",
+    "filename": "S07_books.png",
+    "name": "Bookshop",
+    "frame": "green_wood",
+    "contents": "Books, tall shelves, globe, bookseller reading",
+    "model_bays": [
+      "F2",
+      "D5",
+      "C8"
+    ],
+    "layout": "Side entry, wide display; reading lamp",
+    "json_candidates": [
+      "books.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S08",
+    "id": "hats",
+    "filename": "S08_hats.png",
+    "name": "Hat shop",
+    "frame": "medium_wood",
+    "contents": "Felt and straw hats on stands, mirror, hat boxes",
+    "model_bays": [
+      "F1",
+      "C7",
+      "B4"
+    ],
+    "layout": "Wide display, no visible person; daylight",
+    "json_candidates": [
+      "hats.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S09",
+    "id": "grocery",
+    "filename": "S09_grocery.png",
+    "name": "Grocery",
+    "frame": "medium_wood",
+    "contents": "Flour and pulses, jars, tins, scale, grocer in apron",
+    "model_bays": [
+      "A6",
+      "D1"
+    ],
+    "layout": "Mostly open, side counter; simple shaded lamp",
+    "json_candidates": [
+      "grocery.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S10",
+    "id": "photo",
+    "filename": "S10_photo.png",
+    "name": "Photography shop",
+    "frame": "iron",
+    "contents": "Bellows cameras, framed monochrome portraits, studio curtain, photographer",
+    "model_bays": [
+      "E6",
+      "C5"
+    ],
+    "layout": "Portrait display and side door; indirect lighting",
+    "json_candidates": [
+      "photo.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S11",
+    "id": "eckmann",
+    "filename": "S11_eckmann.png",
+    "name": "Eckmann department store",
+    "frame": "iron",
+    "contents": "Mannequins, bags, housewares, orderly shelves, saleswoman",
+    "model_bays": [
+      "B1"
+    ],
+    "layout": "Elegant display; understated Art Deco fittings",
+    "json_candidates": [
+      "eckmann.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S12",
+    "id": "amanut",
+    "filename": "S12_amanut.png",
+    "name": "Café Amanut",
+    "frame": "iron",
+    "contents": "Round tables, bentwood chairs, period coffee machine, waiter and two guests",
+    "model_bays": [
+      "B7"
+    ],
+    "layout": "Wide glazed frontage; wall and ceiling lights",
+    "json_candidates": [
+      "amanut.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S13",
+    "id": "icecream",
+    "filename": "S13_icecream.png",
+    "name": "Ice cream shop",
+    "frame": "iron",
+    "contents": "Metal-lidded ice cream counter, cones, stools, seller in white hat",
+    "model_bays": [
+      "E1",
+      "D10"
+    ],
+    "layout": "Open service counter; simple ceiling light",
+    "json_candidates": [
+      "icecream.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S14",
+    "id": "pharmacy",
+    "filename": "S14_pharmacy.png",
+    "name": "Pharmacy",
+    "frame": "dark_wood",
+    "contents": "Brown and blue apothecary bottles, drawer cabinets, pharmacist in coat",
+    "model_bays": [
+      "D3"
+    ],
+    "layout": "Orderly display; neutral illumination",
+    "json_candidates": [
+      "pharmacy.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S15",
+    "id": "candy",
+    "filename": "S15_candy.png",
+    "name": "Sweet shop",
+    "frame": "green_wood",
+    "contents": "Candy jars, chocolate boxes, scale, saleswoman",
+    "model_bays": [
+      "D7",
+      "A5"
+    ],
+    "layout": "Asymmetric entry; single pendant",
+    "json_candidates": [
+      "candy.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S16",
+    "id": "kiosk",
+    "filename": "S16_kiosk.png",
+    "name": "Kiosk",
+    "frame": "medium_wood",
+    "contents": "Open counter, soda bottles and siphon, unreadable newspapers, seller",
+    "model_bays": [
+      "C1",
+      "E8",
+      "D2"
+    ],
+    "layout": "Open service hatch; daylight",
+    "json_candidates": [
+      "kiosk.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S17",
+    "id": "galor",
+    "filename": "S17_galor.png",
+    "name": "Gal-Or (unverified business type)",
+    "frame": "iron",
+    "contents": "Lamps, shades, wooden radio, salesperson",
+    "model_bays": [
+      "A2"
+    ],
+    "layout": "Some lamps switched off; restrained light",
+    "json_candidates": [
+      "galor.json"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S18",
+    "id": "dogs",
+    "filename": "S18_dogs.png",
+    "name": "Dog supply shop",
+    "name_he": "חנות לכלבים",
+    "frame": "medium_wood",
+    "contents": "Plain sacks of dog feed, collars and leashes, simple metal bowls, one dog beside the keeper",
+    "layout": "Open for business, wide window display with a side entrance, soft daylight",
+    "json_candidates": [],
+    "model_bays": [
+      "F4",
+      "D4"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S19",
+    "id": "restaurant",
+    "filename": "S19_restaurant.png",
+    "name": "Neighborhood restaurant",
+    "name_he": "מסעדה עממית",
+    "frame": "iron",
+    "contents": "Simple dining tables, plates and serving dishes, a service counter and a server in a period apron",
+    "layout": "Open for business, glazed frontage with central entry, shallow dining room and muted ceiling lights",
+    "json_candidates": [],
+    "model_bays": [
+      "E4",
+      "D6",
+      "B6"
+    ],
+    "status": "pending"
+  },
+  {
+    "number": "S20",
+    "id": "workshop",
+    "filename": "S20_workshop.png",
+    "name": "Workshop",
+    "frame": "iron",
+    "contents": "Workbench, hand tools, wood or metal pieces, craftsperson",
+    "model_bays": [
+      "C6",
+      "D8"
+    ],
+    "layout": "Wide entrance; functional task lamp",
+    "json_candidates": [
+      "general_workshop.json",
+      "workshop.json"
+    ],
+    "status": "pending",
+    "name_he": "בית מלאכה"
+  }
+]

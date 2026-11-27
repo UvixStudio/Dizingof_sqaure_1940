@@ -144,7 +144,8 @@ def column(bm, ch, s, inset, r, z1, mat, seg=10):
           for i in range(seg)]
     hi = [bm.verts.new((v.co.x, v.co.y, z1)) for v in lo]
     for i in range(seg):
-        bm.faces.new((lo[i], lo[(i + 1) % seg], hi[(i + 1) % seg], hi[i])).material_index = mat
+        f = bm.faces.new((lo[i], lo[(i + 1) % seg], hi[(i + 1) % seg], hi[i]))
+        f.material_index, f.smooth = mat, True
 
 
 def awning(bm, ch, s0, s1, mat):
