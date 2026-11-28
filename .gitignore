@@ -12,8 +12,9 @@ blender/preview/ref/
 blender/preview/*.png
 blender/preview/*_blend.jpg
 blender/preview/about/archive/
-# מוזיקת רקע: זכויות לא מוסדרות, נשארת מקומית
-blender/preview/audio/
+# מוזיקת רקע: רק הקטע שבאתר נכנס למאגר
+blender/preview/audio/*
+!blender/preview/audio/ambient.m4a
 blender/*.blend
 blender/*.blend1
 facelift/.server.log

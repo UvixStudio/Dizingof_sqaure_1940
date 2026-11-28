@@ -1,10 +1,9 @@
 // ---------- background music: a loop under the scene, with one button to switch it off ----------
-  // For now it runs only on this computer and its home network (MUSIC_ON): the rights in the recording are not cleared, so it
-  // stays out of the repository (blender/preview/audio/ is in .gitignore). The public site shows no button.
-  // Where the file is missing the button never appears. The music starts with the page; most browsers refuse sound
-  // before a touch or a key, and then it begins with the first one. Every new visit starts with it on, and a stop is
-  // kept for that tab only. It stops while a film plays in a window, and while the page is out of sight.
-  const MUSIC_ON = /^(localhost|127\.0\.0\.1|192\.168\.|10\.)/.test(location.hostname);
+  // The track is blender/preview/audio/ambient.m4a: the first piece of Marek Weber's "In Old Vienna", cut and turned
+  // down. Published by the owner's decision; rights holders can ask for removal (see "about"). Where the file is
+  // missing the button never appears. The music starts with the page; most browsers refuse sound before a touch or
+  // a key, and then it begins with the first one. Every new visit starts with it on, and a stop is kept for that
+  // tab only. It stops while a film plays in a window, and while the page is out of sight.
   const MUSIC = { artist: "Marek Weber", title: "In Old Vienna" };           // whose track it is: shown while it plays and in "about"
   let musicReady = Promise.resolve(false);      // true once there is a track to play and nobody stopped it
   {
@@ -39,7 +38,7 @@
     // a film opened in the window silences the music; closing the window brings it back
     new MutationObserver(apply).observe(card, { childList: true, subtree: true });
     document.addEventListener("visibilitychange", apply);
-    if (MUSIC_ON) musicReady = fetch(TRACK, { method: "HEAD" }).then((r) => {
+    musicReady = fetch(TRACK, { method: "HEAD" }).then((r) => {
       if (!r.ok) return false;
       audio = new Audio(); audio.preload = "none"; audio.loop = true; audio.src = TRACK;
       btn.hidden = false; draw();
