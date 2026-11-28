@@ -108,6 +108,7 @@ html = rep(html, '<div dir="rtl">', '''<div dir="rtl">
     <div class="load-track"><i id="load-bar"></i></div>
     <p><span id="load-text">טוענים את הכיכר</span> <span id="load-pct" dir="ltr">0%</span></p>
     <button class="pill" id="load-again" hidden>לנסות שוב</button>
+    <button class="enter" type="button" id="load-go" hidden>כניסה לכיכר</button>
   </div>''')
 html = rep(html, "</head>", '<link rel="preload" as="fetch" crossorigin href="../kikar_web.glb.gz?t=%d">\n</head>' % STAMP)
 # a new address on every build, so a browser never keeps running yesterday's scene.js

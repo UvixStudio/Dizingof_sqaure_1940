@@ -36,6 +36,7 @@
     progress(.98, "מדליקים את האור"); await painted();
     renderer.compile(scene, camera); await painted(); await painted();
     progress(1); shown = true;
+    await atTheDoor();
     veilLoad.classList.add("done"); introStart();
     setTimeout(() => { veilLoad.hidden = true; if (!introOn && !tourMaybe()) showHint(); }, 700);
   }

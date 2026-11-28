@@ -10,7 +10,7 @@
     // title and loading
     "כיכר צינה (דיזנגוף)": "Zina Square (Dizengoff)", "שחזור תלת־ממד 1940": "3D reconstruction, 1940",
     "טוענים את הכיכר": "Loading the square", "מרכיבים את הכיכר": "Putting the square together", "מדליקים את האור": "Switching on the lights",
-    "לנסות שוב": "Try again", "הטעינה נכשלה. בדקו את החיבור.": "Loading failed. Check your connection.",
+    "לנסות שוב": "Try again", "כניסה לכיכר": "Enter the square", "הטעינה נכשלה. בדקו את החיבור.": "Loading failed. Check your connection.",
     // the bar and its menus
     "מהגג": "Rooftop", "בתוך הכיכר": "In the square", "מהמדרכה": "Sidewalk", "מבט על": "Bird's eye", "מאחורי מכונית": "Behind a car", "מבט חופשי": "Free view",
     "סיבוב עם הטלפון": "Turn with phone", "יישור לצפון": "Align north", "נקודות מידע": "Stories",

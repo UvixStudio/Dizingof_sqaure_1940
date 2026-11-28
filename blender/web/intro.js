@@ -12,7 +12,7 @@
   function introWanted() {
     let quiet = false;                                       // just changed language: no second flight
     try { quiet = sessionStorage.getItem("kikarQuiet") === "1"; sessionStorage.removeItem("kikarQuiet"); } catch (e) { /* private window */ }
-    if (quiet) return false;
+    if (quiet) { INTRO.quiet = true; return false; }
     if (INTRO.done || /[?&]nointro\b/.test(location.search)) return false;
     return !!INTRO_HOLD || /[?&]intro\b/.test(location.search) || !reduce;     // asked for less motion: no flight
   }
@@ -241,8 +241,8 @@
     document.body.classList.remove("intro");
     setView("roof"); if (!tourMaybe()) showHint();
   }
-  // until it ends only the skip button answers: a stray touch must not turn the camera or open something
+  // until it ends only the entry, skip and music buttons answer: a stray touch must not turn the camera or open something
   ["pointerdown", "pointerup", "click", "wheel"].forEach((type) => addEventListener(type, (e) => {
-    if (introOn && !(e.target.closest && e.target.closest(".skip"))) { e.stopPropagation(); if (e.cancelable) e.preventDefault(); }
+    if (introOn && !(e.target.closest && e.target.closest(".skip, #sound-btn, #load-go"))) { e.stopPropagation(); if (e.cancelable) e.preventDefault(); }
   }, { capture: true, passive: false }));
-  addEventListener("keydown", (e) => { if (introOn && e.key === "Escape") { e.stopPropagation(); introEnd(); } }, true);
+  addEventListener("keydown", (e) => { if (introOn && INTRO.running && e.key === "Escape") { e.stopPropagation(); introEnd(); } }, true);

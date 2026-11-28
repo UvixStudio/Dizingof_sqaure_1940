@@ -12,7 +12,7 @@
     // title and loading
     "כיכר צינה (דיזנגוף)": "Zina Square (Dizengoff)", "שחזור תלת־ממד 1940": "3D reconstruction, 1940",
     "טוענים את הכיכר": "Loading the square", "מרכיבים את הכיכר": "Putting the square together", "מדליקים את האור": "Switching on the lights",
-    "לנסות שוב": "Try again", "הטעינה נכשלה. בדקו את החיבור.": "Loading failed. Check your connection.",
+    "לנסות שוב": "Try again", "כניסה לכיכר": "Enter the square", "הטעינה נכשלה. בדקו את החיבור.": "Loading failed. Check your connection.",
     // the bar and its menus
     "מהגג": "Rooftop", "בתוך הכיכר": "In the square", "מהמדרכה": "Sidewalk", "מבט על": "Bird's eye", "מאחורי מכונית": "Behind a car", "מבט חופשי": "Free view",
     "סיבוב עם הטלפון": "Turn with phone", "יישור לצפון": "Align north", "נקודות מידע": "Stories",
@@ -1293,6 +1293,7 @@ $("info-btn").addEventListener("click", () => openAbout());
     progress(.98, "מדליקים את האור"); await painted();
     renderer.compile(scene, camera); await painted(); await painted();
     progress(1); shown = true;
+    await atTheDoor();
     veilLoad.classList.add("done"); introStart();
     setTimeout(() => { veilLoad.hidden = true; if (!introOn && !tourMaybe()) showHint(); }, 700);
   }
@@ -1506,7 +1507,7 @@ $("info-btn").addEventListener("click", () => openAbout());
     });
     placeShadows();
   }
-  const BUILD = 1795811291;
+  const BUILD = 1795862994;
   setInterval(async () => {
     try {
       const v = await (await fetch("build.json?t=" + Date.now(), { cache: "no-store" })).json();
@@ -2177,7 +2178,8 @@ $("info-btn").addEventListener("click", () => openAbout());
         <li>${say("איורי חזיתות החנויות והגרסאות הצבועות של התצלומים נוצרו בבינה מלאכותית.", "The shopfront illustrations and the coloured versions of the photographs were made with AI.")}</li>
       </ul>
       <p class="credit">${say("הדמויות מבוססות על הדגמים", "The figures are based on the models")} <a href="https://polyfork.dev/asset/audience-gentleman-base" target="_blank" rel="noopener"><bdi>Audience gentleman</bdi></a>, <a href="https://polyfork.dev/asset/human-vest-shorts-base" target="_blank" rel="noopener"><bdi>Human vest shorts</bdi></a>, <a href="https://polyfork.dev/asset/taverna-waiter-base" target="_blank" rel="noopener"><bdi>Taverna waiter</bdi></a>, <a href="https://polyfork.dev/asset/older-woman-with-a-basket-base" target="_blank" rel="noopener"><bdi>Older woman with a basket</bdi></a>, <a href="https://polyfork.dev/asset/teen-audience-member-base" target="_blank" rel="noopener"><bdi>Teen audience member</bdi></a>, <a href="https://polyfork.dev/asset/child-at-the-fun-fair-base" target="_blank" rel="noopener"><bdi>Child at the fun fair</bdi></a> ${say("מאת", "by")} <a href="https://polyfork.dev" target="_blank" rel="noopener"><bdi>Polyfork</bdi></a>, ${say("ברישיון", "licensed")} <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener"><bdi>CC BY 4.0</bdi></a>. ${say("הדגמים שונו: צבעים, לבוש, כובעים, תנוחות והפחתת פרטים", "The models were changed: colours, clothes, hats, poses and less detail")}.</p>
-      <p class="credit">${say("זכויות היוצרים בתצלומים, בסרטים ובחומרי הארכיון שמורות לבעליהן. לתיקון קרדיט או להסרה אפשר לפנות בוואטסאפ שבראש החלון.", "Copyright in the photographs, films and archive material stays with its owners. To correct a credit or ask for removal, write on WhatsApp using the button near the top of this window.")}</p></section>
+      ${$("sound-btn").hidden ? "" : `<p class="credit">${say("מוזיקת רקע", "Background music")}: <bdi>${MUSIC.title}, ${MUSIC.artist}</bdi></p>`}
+      <p class="credit disclaimer">${say("פרויקט לימודי והיסטורי בלבד, ללא מטרות רווח, כמחווה לתל אביב של 1940. כל החומרים של אחרים שמשולבים באתר ובסצנה, ובהם תצלומים, סרטים, תוכניות, כרזות, מוזיקה, מפות, דגמים, איורים וגופנים, שייכים לבעליהם המקוריים, והזכויות בהם שמורות להם. חומרים ברישיון פתוח מוצגים לפי תנאי הרישיון. השימוש בחומרים אינו טענה לבעלות עליהם. בעלי זכויות שמבקשים לתקן קרדיט או להסיר חומר מוזמנים לפנות בוואטסאפ שבראש החלון, והבקשה תטופל.", "A project for study and history only, not for profit, made as a homage to the Tel Aviv of 1940. All third-party material in this website and its scene, including photographs, films, plans, posters, music, maps, models, illustrations and fonts, belongs to its original owners, who keep the rights in it. Openly licensed material is shown under the terms of its licence. Using material is not a claim to own it. Rights holders who want a credit corrected or material removed are welcome to write on WhatsApp using the button near the top of this window, and the request will be handled.")}</p></section>
     </div>`;
     card.hidden = false; $("veil").hidden = false; $("notes").hidden = true;
     $("card-x").addEventListener("click", closeCard); $("card-share").addEventListener("click", (e) => share(e.currentTarget)); $("card-x").focus({ preventScroll: true });
@@ -2669,7 +2671,7 @@ $("info-btn").addEventListener("click", () => openAbout());
   function introWanted() {
     let quiet = false;                                       // just changed language: no second flight
     try { quiet = sessionStorage.getItem("kikarQuiet") === "1"; sessionStorage.removeItem("kikarQuiet"); } catch (e) { /* private window */ }
-    if (quiet) return false;
+    if (quiet) { INTRO.quiet = true; return false; }
     if (INTRO.done || /[?&]nointro\b/.test(location.search)) return false;
     return !!INTRO_HOLD || /[?&]intro\b/.test(location.search) || !reduce;     // asked for less motion: no flight
   }
@@ -2898,11 +2900,11 @@ $("info-btn").addEventListener("click", () => openAbout());
     document.body.classList.remove("intro");
     setView("roof"); if (!tourMaybe()) showHint();
   }
-  // until it ends only the skip button answers: a stray touch must not turn the camera or open something
+  // until it ends only the entry, skip and music buttons answer: a stray touch must not turn the camera or open something
   ["pointerdown", "pointerup", "click", "wheel"].forEach((type) => addEventListener(type, (e) => {
-    if (introOn && !(e.target.closest && e.target.closest(".skip"))) { e.stopPropagation(); if (e.cancelable) e.preventDefault(); }
+    if (introOn && !(e.target.closest && e.target.closest(".skip, #sound-btn, #load-go"))) { e.stopPropagation(); if (e.cancelable) e.preventDefault(); }
   }, { capture: true, passive: false }));
-  addEventListener("keydown", (e) => { if (introOn && e.key === "Escape") { e.stopPropagation(); introEnd(); } }, true);
+  addEventListener("keydown", (e) => { if (introOn && INTRO.running && e.key === "Escape") { e.stopPropagation(); introEnd(); } }, true);
 // ---------- a short first visit tour: what there is to do here, one blue tip at a time ----------
   // It runs once, after the opening, and again from the round button. ?tour shows it again, ?notour never.
   const TOUR_TOUCH = matchMedia("(pointer: coarse)").matches, TOUR_TAP = TOUR_TOUCH ? "נוגעים" : "לוחצים";
@@ -3031,13 +3033,19 @@ $("info-btn").addEventListener("click", () => openAbout());
   addEventListener("keydown", (e) => { if (TOUR.el && e.key === "Escape") { e.stopPropagation(); tourEnd(); } }, true);
   $("quick-tour").addEventListener("click", () => setTimeout(tourStart, 0));   // after the menu has closed
 // ---------- background music: a loop under the scene, with one button to switch it off ----------
-  // The track is a local file (blender/preview/audio/, not in the repository until its rights are settled).
-  // Where the file is missing the button never appears. Browsers allow sound only after a touch or a key, so the
-  // music begins with the first one. It stops while a film plays in a window, and while the page is out of sight.
+  // For now it runs only on this computer and its home network (MUSIC_ON): the rights in the recording are not cleared, so it
+  // stays out of the repository (blender/preview/audio/ is in .gitignore). The public site shows no button.
+  // Where the file is missing the button never appears. The music starts with the page; most browsers refuse sound
+  // before a touch or a key, and then it begins with the first one. Every new visit starts with it on, and a stop is
+  // kept for that tab only. It stops while a film plays in a window, and while the page is out of sight.
+  const MUSIC_ON = /^(localhost|127\.0\.0\.1|192\.168\.|10\.)/.test(location.hostname);
+  const MUSIC = { artist: "Marek Weber", title: "In Old Vienna" };           // whose track it is: shown while it plays and in "about"
+  let musicReady = Promise.resolve(false);      // true once there is a track to play and nobody stopped it
   {
-    const TRACK = "../audio/ambient.m4a", btn = $("sound-btn"), card = $("card");
+    const TRACK = "../audio/ambient.m4a?v=4",   /* v: raise when the file changes */ btn = $("sound-btn"), card = $("card"), credit = $("now-playing");
+    credit.querySelector("b").textContent = MUSIC.artist; credit.querySelectorAll("em").forEach((e) => { e.textContent = "\u266A " + MUSIC.title; });
     let audio = null, started = false, fade = 0, want = true;
-    try { want = localStorage.getItem("kikarSound") !== "0"; } catch (e) { /* private window: on */ }
+    try { want = sessionStorage.getItem("kikarSound") !== "0"; } catch (e) { /* storage blocked: on */ }
     const filming = () => !!card.querySelector("iframe, .film");
     function draw() {
       const on = started && want, label = say(on ? "השתקת המוזיקה" : "הפעלת המוזיקה", on ? "Mute the music" : "Play the music");
@@ -3049,7 +3057,7 @@ $("info-btn").addEventListener("click", () => openAbout());
       if (!(started && want) || filming() || document.hidden) { audio.pause(); return; }
       if (!audio.paused) { audio.volume = 1; return; }
       audio.volume = 0;                                      // comes in softly (iPhones ignore volume: the file itself is quiet)
-      audio.play().then(() => { fade = setInterval(() => { audio.volume = Math.min(1, audio.volume + .08); if (audio.volume >= 1) clearInterval(fade); }, 80); })
+      audio.play().then(() => { draw(); fade = setInterval(() => { audio.volume = Math.min(1, audio.volume + .08); if (audio.volume >= 1) clearInterval(fade); }, 80); })
         .catch(() => { started = false; draw(); });          // not allowed yet: the next touch tries again
     }
     const first = (e) => {
@@ -3059,17 +3067,27 @@ $("info-btn").addEventListener("click", () => openAbout());
     ["click", "touchend", "keydown"].forEach((n) => addEventListener(n, first, true));
     btn.addEventListener("click", () => {
       want = !(started && want); started = true;
-      try { localStorage.setItem("kikarSound", want ? "1" : "0"); } catch (e) { /* private window: for this visit only */ }
+      try { sessionStorage.setItem("kikarSound", want ? "1" : "0"); } catch (e) { /* storage blocked: until a reload */ }
       draw(); apply();
     });
     // a film opened in the window silences the music; closing the window brings it back
     new MutationObserver(apply).observe(card, { childList: true, subtree: true });
     document.addEventListener("visibilitychange", apply);
-    fetch(TRACK, { method: "HEAD" }).then((r) => {
-      if (!r.ok) return;
+    if (MUSIC_ON) musicReady = fetch(TRACK, { method: "HEAD" }).then((r) => {
+      if (!r.ok) return false;
       audio = new Audio(); audio.preload = "none"; audio.loop = true; audio.src = TRACK;
       btn.hidden = false; draw();
-    }).catch(() => { /* offline: no music */ });
+      if (want) { started = true; apply(); }                 // at once, where the browser allows it
+      return want;
+    }).catch(() => false);                                   // offline: no music
+  }
+  // The door: browsers allow sound only after a press, so with music the loading veil waits for one (load.js).
+  // The press itself starts the music, like any first touch. Not after a change of language, and not with ?nointro.
+  async function atTheDoor() {
+    if (INTRO.quiet || /[?&]nointro\b/.test(location.search) || !(await musicReady)) return;
+    const go = $("load-go");
+    $("load-bar").parentNode.hidden = true; $("load-text").parentNode.hidden = true; go.hidden = false;
+    await new Promise((ok) => go.addEventListener("click", ok, { once: true }));
   }
 requestAnimationFrame(frame);
 })();

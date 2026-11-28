@@ -16,7 +16,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://dizingof-sqaure-1940.vercel.app/assets/og.jpg?v=2">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@400;600;700&family=Heebo:wght@400;500;700&family=Secular+One&display=swap">
-<link rel="stylesheet" href="style.css?v=1795811291">
+<link rel="stylesheet" href="style.css?v=1795862994">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/fontawesome.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/brands.min.css">
 <link rel="preload" as="fetch" crossorigin href="../kikar_web.glb.gz?t=1795781363">
@@ -28,6 +28,7 @@
     <div class="load-track"><i id="load-bar"></i></div>
     <p><span id="load-text">טוענים את הכיכר</span> <span id="load-pct" dir="ltr">0%</span></p>
     <button class="pill" id="load-again" hidden>לנסות שוב</button>
+    <button class="enter" type="button" id="load-go" hidden>כניסה לכיכר</button>
   </div>
   <canvas id="gl" aria-label="סקיצה תלת־ממדית של כיכר צינה (דיזנגוף) ב־1940"></canvas>
   <canvas id="grain" aria-hidden="true"></canvas>
@@ -97,13 +98,13 @@
     </div>
     <button class="quick-btn" id="quick-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="quick-list" aria-label="תפריט: אודות, שיתוף, יום ולילה" title="תפריט"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
   </div>
-  <button class="sound-btn" id="sound-btn" aria-pressed="false" aria-label="הפעלת המוזיקה" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.500-4H4z"/><path class="waves" d="M15.500 9a4.200 4.200 0 0 1 0 6M18 6.500a7.800 7.800 0 0 1 0 11"/><path class="cross" d="M16 9.500l5 5M21 9.500l-5 5"/></svg></button>
+  <button class="sound-btn" id="sound-btn" dir="ltr" aria-pressed="false" aria-label="הפעלת המוזיקה" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.500-4H4z"/><path class="waves" d="M15.500 9a4.200 4.200 0 0 1 0 6M18 6.500a7.800 7.800 0 0 1 0 11"/><path class="cross" d="M16 9.500l5 5M21 9.500l-5 5"/></svg><span class="now-playing" id="now-playing"><b></b><span><i><em></em><em aria-hidden="true"></em></i></span></span></button>
   <button class="lang-btn" id="lang-btn" lang="en" aria-label="English"><span class="long">English</span><span class="short">EN</span></button>
 </div>
 
 
 <script src="../lib/three.min.js"></script>
 <script src="../lib/GLTFLoader.js"></script>
-<script src="scene.js?v=1795811291"></script>
+<script src="scene.js?v=1795862994"></script>
 </body>
 </html>

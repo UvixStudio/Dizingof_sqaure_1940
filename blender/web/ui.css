@@ -110,9 +110,9 @@ body.night .lang-btn { color: #fff; text-shadow: 0 0 8px rgba(0,0,0,.65); }     
 .card .rights li { margin-bottom: 5px; }
 .card .rights a { color: inherit; text-decoration: underline; }
 
-/* during the opening only the title is there; the rest arrives with the square (web/intro.js) */
-.bar, .quick, .lang-btn, .sound-btn { transition: opacity .6s ease; }
-body.intro .bar, body.intro .quick, body.intro .lang-btn, body.intro .sound-btn, body.intro .gesture, body.intro .hint { opacity: 0 !important; visibility: hidden; pointer-events: none; }
+/* during the opening only the title and the music button (it is already playing) are there; the rest arrives with the square (web/intro.js) */
+.bar, .quick, .lang-btn { transition: opacity .6s ease; }
+body.intro .bar, body.intro .quick, body.intro .lang-btn, body.intro .gesture, body.intro .hint { opacity: 0 !important; visibility: hidden; pointer-events: none; }
 .skip { position: fixed; z-index: 8; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); transform: translateX(-50%); display: flex; align-items: center; gap: 2px; min-height: 38px; padding: 0 12px 0 16px;
   border: 1px solid rgba(29,42,90,.22); border-radius: 999px; background: rgba(255,255,255,.55); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); color: var(--blue); font: 600 .84rem/1 var(--body); cursor: pointer; }
 .skip svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
@@ -300,15 +300,36 @@ html[dir="ltr"] .card .cmp .tag.past { right: auto; left: 8px; }
 .card figure.compare bdi { white-space: nowrap; }
 .card .cmp:focus-visible { outline: 2px solid #f5dfa6; outline-offset: 2px; }
 
-/* music on and off: in plain sight, on the other side of the title from the language */
-.sound-btn { position: fixed; z-index: 7; right: 10px; top: calc(env(safe-area-inset-top, 0px) + 22px); box-sizing: border-box; width: 44px; height: 44px; padding: 0; display: grid; place-items: center; cursor: pointer;
-  color: var(--blue); background: rgba(255,250,235,.62); border: 1.5px solid rgba(255,255,255,.75); border-radius: 50%; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: 0 3px 12px rgba(30,22,12,.18); }
+/* music, bottom left as on a short video: the speaker, then the artist with the title passing under it. Bare text, a soft shadow.
+   Under the windows and the bar's menus, which open over this corner */
+.sound-btn { position: fixed; z-index: 4; left: 8px; bottom: calc(env(safe-area-inset-bottom, 0px) + 86px); display: flex; align-items: center; gap: 2px; min-height: 48px; padding: 4px 6px 4px 0; border: 0; background: none; cursor: pointer;
+  color: #fff; text-align: left; text-shadow: 0 1px 2px rgba(0,0,0,.8), 0 0 9px rgba(0,0,0,.55); transition: opacity .3s ease; }
 .sound-btn[hidden] { display: none; }
-.sound-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sound-btn svg { flex: 0 0 auto; width: 24px; height: 24px; padding: 6px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; box-sizing: content-box;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,.75)) drop-shadow(0 0 6px rgba(0,0,0,.45)); }
 .sound-btn .waves, .sound-btn[aria-pressed="true"] .cross { display: none; }
 .sound-btn[aria-pressed="true"] .waves { display: inline; }
-.sound-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
-html[dir="ltr"] .sound-btn { right: auto; left: 10px; }
-@media (min-width: 640px) { .sound-btn { right: auto; left: 104px; } html[dir="ltr"] .sound-btn { left: auto; right: 104px; } }
-body.night .sound-btn { color: #fff; background: rgba(20,28,66,.62); border-color: rgba(255,255,255,.4); }
+.sound-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 10px; }
+.now-playing { display: block; width: 108px; font: 500 .74rem/1.35 var(--body); }
+.now-playing b { display: block; font-size: .82rem; font-weight: 700; }
+.now-playing > span { display: block; overflow: hidden; padding-bottom: 2px; }
+.now-playing i { display: flex; width: max-content; font-style: normal; }
+.now-playing em { flex: none; box-sizing: border-box; min-width: 108px; padding-right: 18px; font-style: normal; white-space: nowrap; }
+.sound-btn[aria-pressed="true"] .now-playing > span { -webkit-mask-image: linear-gradient(90deg, transparent, #000 9%, #000 88%, transparent); mask-image: linear-gradient(90deg, transparent, #000 9%, #000 88%, transparent); }
+.sound-btn[aria-pressed="true"] .now-playing i { animation: pass 7s linear infinite; }     /* stopped: the title stands still */
+@keyframes pass { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+@media (min-width: 800px) { .sound-btn { left: 18px; bottom: calc(env(safe-area-inset-bottom, 0px) + 24px); } }
+@media (max-width: 799px) { body:not(.intro):has(.hint.on) .sound-btn { opacity: 0; pointer-events: none; } }   /* a passing message needs the width */
+body.intro .sound-btn { color: var(--brown); text-shadow: 0 0 6px #ece3cc, 0 0 10px #ece3cc; }     /* on the drawing paper: brown ink */
+body.intro .sound-btn svg { filter: drop-shadow(0 0 4px #ece3cc) drop-shadow(0 0 4px #ece3cc); }
 body.touring .sound-btn { z-index: 21; }                                     /* it can be switched off during the tour too */
+@media (prefers-reduced-motion: reduce) { .sound-btn[aria-pressed="true"] .now-playing i { animation: none; } .sound-btn[aria-pressed="true"] .now-playing > span { -webkit-mask-image: none; mask-image: none; } }
+
+/* the door: with music, the loading veil stays until this press (web/sound.js) */
+.loading .enter { min-height: 52px; margin-top: 10px; padding: 0 42px; border: 0; border-radius: 999px; cursor: pointer; background: var(--brown); color: var(--cream); font: 700 1.15rem/1 var(--body);
+  box-shadow: inset 0 0 0 3px var(--brown), inset 0 0 0 4px rgba(244,234,208,.65), 0 6px 18px rgba(47,33,22,.28); animation: quick-in .35s cubic-bezier(.2,.8,.3,1) backwards; }
+.loading .enter[hidden] { display: none; }
+.loading .enter:active { background: var(--brown-ink); }
+.loading .enter:focus-visible { outline: 2px solid var(--brown); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .loading .enter { animation: none; } }
+.card .rights .disclaimer { margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(216,199,158,.25); }
